@@ -1,6 +1,13 @@
+using Microsoft.EntityFrameworkCore;
+using IpmsSmartAssistant.Api.Data;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add controller discovery and Swagger services
+// 1. Add SQL Server DbContext
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// 2. Add standard API and Swagger services
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
