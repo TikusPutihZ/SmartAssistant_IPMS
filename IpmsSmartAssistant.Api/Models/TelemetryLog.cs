@@ -1,24 +1,14 @@
-using System.ComponentModel.DataAnnotations;
+using System;
 
-namespace IpmsSmartAssistant.Api.Models;
-
-public class TelemetryLog
+namespace IpmsSmartAssistant.Api.Models
 {
-    [Key]
-    public int Id { get; set; }
-
-    [Required]
-    public string UserPrompt { get; set; } = string.Empty;
-
-    public string? ResolutionOutput { get; set; }
-
-    public bool HasScreenshot { get; set; }
-
-    public double LatencyMs { get; set; } // Time taken for Ollama to respond in ms
-
-    public string ModelUsed { get; set; } = "llava";
-
-    public bool IsSuccess { get; set; }
-
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public class TelemetryLog
+    {
+        public int Id { get; set; }
+        public string Prompt { get; set; } = string.Empty;
+        public string Response { get; set; } = string.Empty;
+        public long LatencyMs { get; set; }
+        public DateTime Timestamp { get; set; }
+        public bool IsSuccessful { get; set; }
+    }
 }

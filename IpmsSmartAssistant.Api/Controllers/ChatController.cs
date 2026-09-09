@@ -1,110 +1,105 @@
-using Microsoft.AspNetCore.Mvc;
-using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
+using System;
 using System.Diagnostics;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using IpmsSmartAssistant.Api.Data;
 using IpmsSmartAssistant.Api.Models;
+using IpmsSmartAssistant.Api.Services; // Ensure this matches your service folder namespace
 
-namespace IpmsSmartAssistant.Api.Controllers;
-
-[ApiController]
-[Route("api/[controller]")]
-public class ChatController : ControllerBase
+namespace IpmsSmartAssistant.Api.Controllers
 {
-    private readonly AppDbContext _dbContext;
-    private static readonly HttpClient _httpClient = new HttpClient
+    [Route("api/[controller]")]
+    [ApiController]
+    public class ChatController : ControllerBase
     {
-        BaseAddress = new Uri("http://localhost:11434"),
-        Timeout = TimeSpan.FromMinutes(3)
-    };
+        private readonly AppDbContext _context;
+        private readonly OllamaService _ollamaService;
 
-    // Inject the database context via the constructor
-    public ChatController(AppDbContext dbContext)
-    {
-        _dbContext = dbContext;
-    }
-
-    [HttpPost("ask")]
-    public async Task<IActionResult> AskTroubleshooter([FromForm] string prompt, IFormFile? screenshot)
-    {
-        var sw = Stopwatch.StartNew();
-        string? base64Image = null;
-        string finalSolution = "No response generated.";
-        bool isSuccess = false;
-
-        try
+        public ChatController(AppDbContext context, OllamaService ollamaService)
         {
-            if (screenshot != null && screenshot.Length > 0)
+            _context = context;
+            _ollamaService = ollamaService;
+        }
+
+        [HttpPost("ask")]
+        public async Task<IActionResult> Ask([FromForm] string prompt)
+        {
+            var stopwatch = Stopwatch.StartNew();
+
+            // 1. Retrieve the relevant manual from the SQLite database
+            var allManuals = await _context.KnowledgeBaseEntries.ToListAsync();
+            var matchedManual = allManuals.FirstOrDefault(m =>
+                m.Keywords.Split(',').Any(k => prompt.Contains(k.Trim(), StringComparison.OrdinalIgnoreCase))
+            );
+
+            // 2. Augment the Prompt (RAG logic)
+            string systemInstruction = matchedManual != null
+                ? $"[OFFICIAL MANUAL: {matchedManual.Title}]\n{matchedManual.Content}\n\nINSTRUCTION: You are an IPMS safety assistant. Answer the user's question using ONLY the manual above. Format as a clean step-by-step list."
+                : "INSTRUCTION: You are an IPMS industrial troubleshooting assistant. You only answer questions related to mill equipment, machinery, and factory safety.";
+
+            // Trap the user prompt inside strict boundaries
+            string augmentedPrompt = $@"
+{systemInstruction}
+
+USER QUESTION: {prompt}
+
+CRITICAL RULE: Is the user's question related to industrial equipment or the manual?
+- If YES: Answer the question using ONLY the provided manual.
+- If NO: Reply EXACTLY with 'Error: Query out of scope. I can only assist with IPMS industrial troubleshooting.'
+";
+
+            try
             {
-                using var ms = new MemoryStream();
-                await screenshot.CopyToAsync(ms);
-                base64Image = Convert.ToBase64String(ms.ToArray());
+                // 3. Send augmented prompt to the local Ollama model
+                string solution = await _ollamaService.GenerateTroubleshootingGuideAsync(augmentedPrompt);
+                stopwatch.Stop();
+
+                // 4. Log the telemetry
+                var log = new TelemetryLog
+                {
+                    Prompt = prompt,
+                    Response = solution,
+                    LatencyMs = stopwatch.ElapsedMilliseconds,
+                    Timestamp = DateTime.UtcNow,
+                    IsSuccessful = true
+                };
+                _context.TelemetryLogs.Add(log);
+                await _context.SaveChangesAsync();
+
+                return Ok(new { solution = solution, latency = $"{stopwatch.ElapsedMilliseconds} ms" });
             }
-
-            var fullPrompt = $"You are the technical assistant for FGV IPMS mill operators. " +
-                             $"Provide a concise, step-by-step checklist to resolve this issue: {prompt}";
-
-            var requestPayload = new OllamaRequest
+            catch (Exception ex)
             {
-                Model = "llava",
-                Prompt = fullPrompt,
-                Stream = false,
-                Images = string.IsNullOrEmpty(base64Image) ? null : new List<string> { base64Image }
-            };
+                stopwatch.Stop();
 
-            var jsonContent = new StringContent(JsonSerializer.Serialize(requestPayload), Encoding.UTF8, "application/json");
+                // Log failed attempt
+                var errorLog = new TelemetryLog
+                {
+                    Prompt = prompt,
+                    Response = $"Error: {ex.Message}",
+                    LatencyMs = stopwatch.ElapsedMilliseconds,
+                    Timestamp = DateTime.UtcNow,
+                    IsSuccessful = false
+                };
+                _context.TelemetryLogs.Add(errorLog);
+                await _context.SaveChangesAsync();
 
-            var response = await _httpClient.PostAsync("/api/generate", jsonContent);
-            response.EnsureSuccessStatusCode();
-
-            var responseBody = await response.Content.ReadAsStringAsync();
-            var result = JsonSerializer.Deserialize<OllamaResponse>(responseBody);
-            
-            finalSolution = result?.Response ?? finalSolution;
-            isSuccess = true;
-        }
-        catch (Exception ex)
-        {
-            finalSolution = $"Error communicating with local AI model: {ex.Message}";
-        }
-        finally
-        {
-            sw.Stop();
-
-            // Save the interaction to the SQLite database
-            var log = new TelemetryLog
-            {
-                UserPrompt = prompt,
-                ResolutionOutput = finalSolution,
-                HasScreenshot = screenshot != null,
-                LatencyMs = sw.ElapsedMilliseconds,
-                IsSuccess = isSuccess
-            };
-
-            _dbContext.TelemetryLogs.Add(log);
-            await _dbContext.SaveChangesAsync();
+                return StatusCode(500, new { error = ex.Message });
+            }
         }
 
-        return Ok(new
+        [HttpGet("logs")]
+        public async Task<IActionResult> GetLogs()
         {
-            Success = isSuccess,
-            Solution = finalSolution,
-            Latency = $"{sw.ElapsedMilliseconds} ms",
-            Timestamp = DateTime.UtcNow
-        });
-    }
+            // Retrieve the 10 most recent telemetry logs
+            var logs = await _context.TelemetryLogs
+                .OrderByDescending(l => l.Timestamp)
+                .Take(10)
+                .ToListAsync();
 
-    public class OllamaRequest
-    {
-        [JsonPropertyName("model")] public string Model { get; set; } = string.Empty;
-        [JsonPropertyName("prompt")] public string Prompt { get; set; } = string.Empty;
-        [JsonPropertyName("stream")] public bool Stream { get; set; } = false;
-        [JsonPropertyName("images")] [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public List<string>? Images { get; set; }
-    }
-
-    public class OllamaResponse
-    {
-        [JsonPropertyName("response")] public string Response { get; set; } = string.Empty;
+            return Ok(logs);
+        }
     }
 }
