@@ -1,122 +1,65 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { useState } from 'react';
+import AdminDashboard from './components/AdminDashboard';
 
-function App() {
-  const [count, setCount] = useState(0)
+export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (username === 'admin' && password === 'fgv-ipms-2026') {
+      setIsAuthenticated(true);
+    } else {
+      setError('Invalid credentials. Access denied.');
+    }
+  };
+
+  if (isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-slate-900">
+        <div className="bg-slate-950 p-4 flex justify-between border-b border-slate-800 text-slate-300">
+          <span className="font-semibold tracking-wide">IPMS Secure Management</span>
+          <button onClick={() => setIsAuthenticated(false)} className="hover:text-red-400 text-sm transition-colors">
+            Logout
+          </button>
+        </div>
+        <AdminDashboard />
+      </div>
+    );
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
+    <div className="min-h-screen flex items-center justify-center bg-slate-900 text-slate-100 font-sans">
+      <form onSubmit={handleLogin} className="bg-slate-800 p-8 rounded-xl border border-slate-700 shadow-2xl w-96 space-y-5">
+        <h2 className="text-2xl font-bold text-center text-slate-100 mb-2">Admin Portal</h2>
+        {error && <p className="text-red-400 text-sm text-center bg-red-900/20 p-2 rounded">{error}</p>}
+        
         <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
+          <label className="block text-sm mb-1 text-slate-400">Username</label>
+          <input 
+            type="text" 
+            value={username} 
+            onChange={(e) => setUsername(e.target.value)} 
+            className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 focus:outline-none focus:border-blue-500 transition-colors" 
+          />
         </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
+        
+        <div>
+          <label className="block text-sm mb-1 text-slate-400">Password</label>
+          <input 
+            type="password" 
+            value={password} 
+            onChange={(e) => setPassword(e.target.value)} 
+            className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 focus:outline-none focus:border-blue-500 transition-colors" 
+          />
+        </div>
+        
+        <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 rounded-lg mt-2 transition-all shadow-md">
+          Secure Login
         </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      </form>
+    </div>
+  );
 }
-
-export default App
