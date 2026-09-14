@@ -93,9 +93,11 @@ export default function ChatInterface() {
                 {msg.role === 'user' ? (
                   msg.content
                 ) : (
-                  <ReactMarkdown className="space-y-2 leading-relaxed font-sans">
-                    {msg.content}
-                  </ReactMarkdown>
+                  <div className="space-y-2 leading-relaxed font-sans">
+                    <ReactMarkdown>
+                      {msg.content || ""}
+                    </ReactMarkdown>
+                  </div>
                 )}
               </div>
               {msg.latency && <span className="text-xs text-emerald-500 mt-1 ml-2 font-mono">Lat: {msg.latency}</span>}

@@ -28,27 +28,31 @@ namespace IpmsSmartAssistant.Api.Controllers
         {
             var stopwatch = Stopwatch.StartNew();
 
-            // 1. Retrieve the relevant manual from the SQLite database
-            var allManuals = await _context.KnowledgeBaseEntries.ToListAsync();
-            var matchedManual = allManuals.FirstOrDefault(m =>
-                m.Keywords.Split(',').Any(k => prompt.Contains(k.Trim(), StringComparison.OrdinalIgnoreCase))
-            );
+            // 1. Retrieve the manual
+            var matchedManual = await _context.KnowledgeBaseEntries
+                .FirstOrDefaultAsync(m => prompt.ToLower().Contains(m.Keywords.ToLower()));
 
-            // 2. Augment the Prompt (RAG logic)
-            string systemInstruction = matchedManual != null
-                ? $"[OFFICIAL MANUAL: {matchedManual.Title}]\n{matchedManual.Content}\n\nINSTRUCTION: You are an IPMS safety assistant. Answer the user's question using ONLY the manual above. Format as a clean step-by-step list."
-                : "INSTRUCTION: You are an IPMS industrial troubleshooting assistant. You only answer questions related to mill equipment, machinery, and factory safety.";
+            // 2. Split the AI Prompt Logic
+            string augmentedPrompt;
 
-            // Trap the user prompt inside strict boundaries
-            string augmentedPrompt = $@"
-{systemInstruction}
+            if (matchedManual != null)
+            {
+                // PATH A: Manual found. Force it to answer. Do NOT include the rejection rule.
+                augmentedPrompt = $@"You are an IPMS safety assistant. 
+[OFFICIAL MANUAL: {matchedManual.Title}]
+{matchedManual.Content}
 
+INSTRUCTION: Answer the following user question using ONLY the manual provided above. Provide a clear step-by-step list.
+USER QUESTION: {prompt}";
+            }
+            else
+            {
+                // PATH B: No manual found. Apply the strict guardrail.
+                augmentedPrompt = $@"You are an IPMS industrial troubleshooting assistant. 
 USER QUESTION: {prompt}
 
-CRITICAL RULE: Is the user's question related to industrial equipment or the manual?
-- If YES: Answer the question using ONLY the provided manual.
-- If NO: Reply EXACTLY with 'Error: Query out of scope. I can only assist with IPMS industrial troubleshooting.'
-";
+CRITICAL RULE: If the question is about a recipe, poem, general coding, or casual chat, you MUST reply EXACTLY with: 'Error: Query out of scope. I can only assist with IPMS industrial troubleshooting.' Otherwise, answer the industrial query based on general safety.";
+            }
 
             try
             {
