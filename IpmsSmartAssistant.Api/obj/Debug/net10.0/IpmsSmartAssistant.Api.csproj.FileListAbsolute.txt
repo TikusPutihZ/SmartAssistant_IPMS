@@ -198,3 +198,5 @@ C:\SmartAssistant_IPMS\IpmsSmartAssistant.Api\bin\Debug\net10.0\IpmsSmartAssista
 C:\SmartAssistant_IPMS\IpmsSmartAssistant.Api\bin\Debug\net10.0\IpmsSmartAssistant.Web\package.json
 C:\SmartAssistant_IPMS\IpmsSmartAssistant.Api\bin\Debug\net10.0\package-lock.json
 C:\SmartAssistant_IPMS\IpmsSmartAssistant.Api\bin\Debug\net10.0\package.json
+C:\SmartAssistant_IPMS\IpmsSmartAssistant.Api\bin\Debug\net10.0\IpmsAdminDashboard.Web\package-lock.json
+C:\SmartAssistant_IPMS\IpmsSmartAssistant.Api\bin\Debug\net10.0\IpmsAdminDashboard.Web\package.json

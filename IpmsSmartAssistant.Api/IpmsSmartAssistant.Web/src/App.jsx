@@ -1,11 +1,11 @@
-import ChatInterface from './components/ChatInterface'
+import ChatInterface from './components/ChatInterface';
 
-function App() {
+export default function App() {
   return (
-    <div className="min-h-screen bg-slate-900 selection:bg-blue-500/30">
-      <ChatInterface />
+    <div className="min-h-screen bg-slate-900">
+      <main>
+        <ChatInterface />
+      </main>
     </div>
-  )
+  );
 }
-
-export default App

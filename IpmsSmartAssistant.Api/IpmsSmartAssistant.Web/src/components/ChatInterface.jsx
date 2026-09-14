@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 
 export default function ChatInterface() {
   const [prompt, setPrompt] = useState('');
@@ -42,12 +43,12 @@ export default function ChatInterface() {
 
       const data = await response.json();
       setMessages((prev) => [
-        ...prev, 
+        ...prev,
         { role: 'assistant', content: data.solution, latency: data.latency }
       ]);
     } catch (error) {
       setMessages((prev) => [
-        ...prev, 
+        ...prev,
         { role: 'assistant', content: `Connection Failed: ${error.message}. Ensure the C# backend and Ollama are running.` }
       ]);
     } finally {
@@ -75,8 +76,8 @@ export default function ChatInterface() {
             <p className="mb-6">Select a common issue or describe the problem below.</p>
             <div className="flex flex-col gap-3 w-full max-w-md">
               {quickPrompts.map((qp, i) => (
-                <button 
-                  key={i} 
+                <button
+                  key={i}
                   onClick={() => handleSend(null, qp)}
                   className="bg-slate-800 hover:bg-slate-700 text-slate-200 p-4 rounded-xl border border-slate-700 text-left transition-colors"
                 >
@@ -88,8 +89,14 @@ export default function ChatInterface() {
         ) : (
           messages.map((msg, i) => (
             <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-              <div className={`p-4 rounded-xl whitespace-pre-wrap ${msg.role === 'user' ? 'bg-blue-600 text-white max-w-[80%]' : 'bg-slate-800 text-slate-100 max-w-[90%] border border-slate-700 shadow-md'}`}>
-                {msg.content}
+              <div className={`p-4 rounded-xl ${msg.role === 'user' ? 'bg-blue-600 text-white max-w-[80%] whitespace-pre-wrap' : 'bg-slate-800 text-slate-100 max-w-[90%] border border-slate-700 shadow-md'}`}>
+                {msg.role === 'user' ? (
+                  msg.content
+                ) : (
+                  <ReactMarkdown className="space-y-2 leading-relaxed font-sans">
+                    {msg.content}
+                  </ReactMarkdown>
+                )}
               </div>
               {msg.latency && <span className="text-xs text-emerald-500 mt-1 ml-2 font-mono">Lat: {msg.latency}</span>}
             </div>
@@ -112,8 +119,8 @@ export default function ChatInterface() {
           disabled={isLoading}
           className="flex-1 bg-slate-800 text-white p-4 rounded-xl border border-slate-700 focus:outline-none focus:border-blue-500 transition-all disabled:opacity-50 shadow-inner"
         />
-        <button 
-          type="submit" 
+        <button
+          type="submit"
           disabled={!prompt.trim() || isLoading}
           className="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 text-white px-8 py-4 rounded-xl font-semibold transition-colors shadow-md"
         >
