@@ -152,7 +152,7 @@ export default function AdminDashboard() {
       </aside>
 
       {/* Main Content Area */}
-      <main ref={reportRef} className="flex-1 p-8 overflow-y-auto">
+      <main ref={reportRef} className="flex-1 p-8 overflow-y-auto no-scrollbar">
 
         {activeTab === 'overview' && (
           <>
@@ -199,7 +199,7 @@ export default function AdminDashboard() {
                   </ResponsiveContainer>
                 </div>
               </div>
-              <div className="p-6 bg-slate-800 rounded-2xl border border-slate-700 shadow-sm flex flex-col">
+              <div className="p-6 bg-slate-800 rounded-2xl border border-slate-700 shadow-sm flex flex-col no-scrollbar">
                 <h3 className="text-lg font-semibold mb-4 text-slate-200">AI Shift Summary</h3>
                 <div className="flex-1 overflow-y-auto text-slate-300 text-sm leading-relaxed bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
                   {aiSummary ? (
@@ -264,9 +264,9 @@ export default function AdminDashboard() {
               <p className="text-slate-400 mt-1">Add or remove industrial manuals for the RAG engine.</p>
             </header>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
 
-              {/* NEW: PDF Upload Zone */}
+              {/*1. PDF Upload Zone */}
               <div className="p-6 bg-slate-800 rounded-2xl border border-slate-700 shadow-sm flex flex-col items-center justify-center border-dashed border-2 hover:border-blue-500 transition-colors cursor-pointer relative">
                 <input
                   type="file"
@@ -285,7 +285,7 @@ export default function AdminDashboard() {
                   </>
                 )}
               </div>
-              {/* Input Form */}
+              {/* 2. Manual Input Form */}
               <div className="lg:col-span-1 p-6 bg-slate-800 rounded-2xl border border-slate-700 shadow-sm h-fit">
                 <h3 className="text-lg font-semibold mb-4 text-slate-200">Add New Manual</h3>
                 <form onSubmit={handleAddManual} className="space-y-4">
@@ -315,31 +315,32 @@ export default function AdminDashboard() {
                   </button>
                 </form>
               </div>
+            </div>
 
-              {/* Existing Manuals List */}
-              <div className="lg:col-span-2 p-6 bg-slate-800 rounded-2xl border border-slate-700 shadow-sm">
-                <h3 className="text-lg font-semibold mb-4 text-slate-200">Active Manuals</h3>
-                <div className="space-y-4">
-                  {knowledgeBase.length === 0 ? (
-                    <p className="text-slate-500">No manuals found in the database.</p>
-                  ) : (
-                    knowledgeBase.map((entry) => (
-                      <div key={entry.id} className="p-4 bg-slate-900 rounded-xl border border-slate-700 flex justify-between items-start gap-4">
-                        <div>
-                          <h4 className="font-semibold text-blue-400">{entry.category || `Manual #${entry.id}`}</h4>
-                          <p className="text-sm text-slate-300 mt-2 whitespace-pre-wrap">{entry.content}</p>
-                        </div>
-                        <button
-                          onClick={() => handleDeleteManual(entry.id)}
-                          className="px-3 py-1 bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 rounded transition-colors text-sm">
-                          Delete
-                        </button>
+            {/* 3. Existing Manuals List */}
+            <div className="lg:col-span-2 p-6 bg-slate-800 rounded-2xl border border-slate-700 shadow-sm">
+              <h3 className="text-lg font-semibold mb-4 text-slate-200">Active Manuals</h3>
+              <div className="space-y-4">
+                {knowledgeBase.length === 0 ? (
+                  <p className="text-slate-500">No manuals found in the database.</p>
+                ) : (
+                  knowledgeBase.map((entry) => (
+                    <div key={entry.id} className="p-4 bg-slate-900 rounded-xl border border-slate-700 flex justify-between items-start gap-4">
+                      <div>
+                        <h4 className="font-semibold text-blue-400">{entry.category || `Manual #${entry.id}`}</h4>
+                        <p className="text-sm text-slate-300 mt-2 whitespace-pre-wrap">{entry.content}</p>
                       </div>
-                    ))
-                  )}
-                </div>
+                      <button
+                        onClick={() => handleDeleteManual(entry.id)}
+                        className="px-3 py-1 bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 rounded transition-colors text-sm">
+                        Delete
+                      </button>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
+
           </div>
         )}
       </main>
