@@ -1,22 +1,37 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useReactToPrint } from 'react-to-print';
 
 export default function AdminDashboard() {
   const [logs, setLogs] = useState([]);
   const [stats, setStats] = useState({ totalQueries: 0, blockedAttempts: 0, topIssue: '--' });
   const [isLoading, setIsLoading] = useState(true);
+  const [aiSummary, setAiSummary] = useState('');
+
+  // 1. Create a reference to the part of the screen we want to print
+  const reportRef = useRef(null);
+
+  // 2. Initialize the print function
+  const handlePrint = useReactToPrint({
+    contentRef: reportRef,
+    documentTitle: 'IPMS_Telemetry_Report',
+  });
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        // Fetch table logs
         const logsRes = await fetch('http://localhost:5268/api/chat/logs');
         if (logsRes.ok) setLogs(await logsRes.json());
 
-        // Fetch the new top-level stats
         const statsRes = await fetch('http://localhost:5268/api/chat/stats');
         if (statsRes.ok) setStats(await statsRes.json());
 
+        // NEW: Fetch the AI-generated summary
+        const summaryRes = await fetch('http://localhost:5268/api/chat/summary');
+        if (summaryRes.ok) {
+          const summaryData = await summaryRes.json();
+          setAiSummary(summaryData.summary);
+        }
       } catch (error) {
         console.error("Failed to fetch dashboard data:", error);
       } finally {
@@ -48,12 +63,17 @@ export default function AdminDashboard() {
         <nav className="space-y-2 flex-1">
           <button className="w-full text-left px-4 py-3 bg-blue-600/10 text-blue-400 rounded-xl font-medium">Overview</button>
           <button className="w-full text-left px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-slate-200 rounded-xl transition-colors">Audit Logs</button>
-          <button className="w-full text-left px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-slate-200 rounded-xl transition-colors">Export Report</button>
+          {/* Replace your existing Export Report button with this */}
+          <button
+            onClick={handlePrint}
+            className="w-full text-left px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-slate-200 rounded-xl transition-colors">
+            Export Report
+          </button>
         </nav>
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 p-8 overflow-y-auto">
+      <main ref={reportRef} className="flex-1 p-8 overflow-y-auto">
         <header className="mb-8">
           <h2 className="text-3xl font-bold text-slate-100">Dashboard Overview</h2>
           <p className="text-slate-400 mt-1">Real-time equipment telemetry and AI guardrail monitoring.</p>
@@ -97,9 +117,21 @@ export default function AdminDashboard() {
               </ResponsiveContainer>
             </div>
           </div>
-          <div className="p-6 bg-slate-800 rounded-2xl border border-slate-700 shadow-sm">
-            <h3 className="text-lg font-semibold mb-4 text-slate-200">AI Summary</h3>
-            <p className="text-slate-400 text-sm leading-relaxed">Summary generation placeholder...</p>
+          <div className="p-6 bg-slate-800 rounded-2xl border border-slate-700 shadow-sm flex flex-col">
+            <h3 className="text-lg font-semibold mb-4 text-slate-200">AI Shift Summary</h3>
+            <div className="flex-1 overflow-y-auto text-slate-300 text-sm leading-relaxed bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
+              {aiSummary ? (
+                <p>{aiSummary}</p>
+              ) : (
+                <span className="flex items-center text-slate-400 animate-pulse">
+                  <svg className="w-5 h-5 mr-2 animate-spin text-blue-500" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Ollama is analyzing the latest logs...
+                </span>
+              )}
+            </div>
           </div>
         </div>
 

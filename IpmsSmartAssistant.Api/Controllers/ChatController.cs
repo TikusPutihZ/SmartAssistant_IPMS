@@ -131,6 +131,29 @@ CRITICAL RULE: If the question is about a recipe, poem, general coding, or casua
             });
         }
 
+        [HttpGet("summary")]
+        public async Task<IActionResult> GetLogSummary()
+        {
+            // 1. Grab the most recent operator queries
+            var recentLogs = await _context.TelemetryLogs
+                .OrderByDescending(l => l.Timestamp)
+                .Take(20)
+                .Select(l => l.Prompt)
+                .ToListAsync();
+
+            if (!recentLogs.Any())
+                return Ok(new { summary = "No telemetry logs available to summarize." });
+
+            // 2. Build a hidden prompt instructing Ollama to act as a data analyst
+            var analysisPrompt = "You are a factory analytics AI. Read the following recent queries from industrial operators and write a concise, 2-sentence shift summary. Mention any recurring equipment issues:\n\n"
+                                 + string.Join("\n- ", recentLogs);
+
+            // 3. Send to your local LLM
+            var summaryResponse = await _ollamaService.GenerateTroubleshootingGuideAsync(analysisPrompt);
+
+            return Ok(new { summary = summaryResponse });
+        }
+
     }
 
 
