@@ -105,5 +105,33 @@ CRITICAL RULE: If the question is about a recipe, poem, general coding, or casua
 
             return Ok(logs);
         }
+        [HttpGet("stats")]
+        public async Task<IActionResult> GetTelemetryStats()
+        {
+            // 1. Count every log in the database
+            var totalQueries = await _context.TelemetryLogs.CountAsync();
+
+            // 2. Count logs where the guardrail blocked the query
+            // (Assuming IsSuccessful is false for out-of-scope queries)
+            var blockedAttempts = await _context.TelemetryLogs.CountAsync(l => l.IsSuccessful == false);
+
+            // 3. Find the most frequently asked prompt using a SQL GROUP BY
+            var topIssue = await _context.TelemetryLogs
+                .GroupBy(l => l.Prompt)
+                .OrderByDescending(g => g.Count())
+                .Select(g => g.Key)
+                .FirstOrDefaultAsync() ?? "No data yet";
+
+            // Return the data as a clean JSON object
+            return Ok(new
+            {
+                TotalQueries = totalQueries,
+                BlockedAttempts = blockedAttempts,
+                TopIssue = topIssue
+            });
+        }
+
     }
+
+
 }
