@@ -11,7 +11,6 @@ export default function AdminDashboard() {
   const [knowledgeBase, setKnowledgeBase] = useState([]);
   const [newTitle, setNewTitle] = useState('');
   const [newContent, setNewContent] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
 
   // Fetch manuals when switching to the Knowledge tab
   const fetchKnowledgeBase = async () => {
@@ -44,7 +43,6 @@ export default function AdminDashboard() {
       }
     } catch (err) { console.error("Failed to add manual:", err); }
   };
-
   // Handle deleting a manual
   const handleDeleteManual = async (id) => {
     try {
@@ -55,7 +53,6 @@ export default function AdminDashboard() {
 
   // 1. Create a reference to the part of the screen we want to print
   const reportRef = useRef(null);
-
   // 2. Initialize the print function
   const handlePrint = useReactToPrint({
     contentRef: reportRef,
@@ -63,22 +60,30 @@ export default function AdminDashboard() {
   });
 
   //Handle PDF upload
-  const handleFileUpload = async (e) => {
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+  // When a file is chosen or dropped, hold it in state instead of uploading instantly
+  const handleFileSelect = (e) => {
     const file = e.target.files[0];
-    if (!file) return;
+    if (file) setSelectedFile(file);
+  };
+  // Triggered only when the admin clicks the "Confirm & Upload PDF" button
+  const handleConfirmUpload = async () => {
+    if (!selectedFile) return;
 
     setIsUploading(true);
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append("file", selectedFile);
 
     try {
       const res = await fetch('http://localhost:5268/api/knowledgebase/upload', {
         method: 'POST',
-        body: formData, // Notice: We do NOT set Content-Type manually for FormData
+        body: formData,
       });
 
       if (res.ok) {
-        fetchKnowledgeBase(); // Refresh the list to show the new PDF content
+        setSelectedFile(null); // Clear selection
+        fetchKnowledgeBase(); // Refresh list
       } else {
         console.error("Upload failed");
       }
@@ -264,83 +269,120 @@ export default function AdminDashboard() {
               <p className="text-slate-400 mt-1">Add or remove industrial manuals for the RAG engine.</p>
             </header>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div className="flex flex-col gap-6">
 
-              {/*1. PDF Upload Zone */}
-              <div className="p-6 bg-slate-800 rounded-2xl border border-slate-700 shadow-sm flex flex-col items-center justify-center border-dashed border-2 hover:border-blue-500 transition-colors cursor-pointer relative">
-                <input
-                  type="file"
-                  accept="application/pdf"
-                  onChange={handleFileUpload}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  disabled={isUploading}
-                />
-                {isUploading ? (
-                  <div className="text-blue-400 animate-pulse font-medium">Processing PDF...</div>
-                ) : (
-                  <>
-                    <svg className="w-10 h-10 text-slate-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
-                    <h3 className="text-sm font-semibold text-slate-200">Upload PDF Manual</h3>
-                    <p className="text-xs text-slate-500 mt-1 text-center">Click or drag a .pdf file here to automatically update the AI.</p>
-                  </>
-                )}
-              </div>
-              {/* 2. Manual Input Form */}
-              <div className="lg:col-span-1 p-6 bg-slate-800 rounded-2xl border border-slate-700 shadow-sm h-fit">
-                <h3 className="text-lg font-semibold mb-4 text-slate-200">Add New Manual</h3>
-                <form onSubmit={handleAddManual} className="space-y-4">
-                  <div>
-                    <label className="block text-sm text-slate-400 mb-1">Equipment / Category</label>
-                    <input
-                      type="text"
-                      value={newTitle}
-                      onChange={(e) => setNewTitle(e.target.value)}
-                      className="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:border-blue-500"
-                      placeholder="e.g. Conveyor Belt"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-slate-400 mb-1">Issue & Resolution Steps</label>
-                    <textarea
-                      value={newContent}
-                      onChange={(e) => setNewContent(e.target.value)}
-                      className="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 h-40 focus:outline-none focus:border-blue-500"
-                      placeholder="Describe the issue and the exact fix..."
-                      required
-                    />
-                  </div>
-                  <button type="submit" className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium transition-colors">
-                    Save to Database
-                  </button>
-                </form>
-              </div>
-            </div>
+              {/* TOP ROW: Upload and Form */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-            {/* 3. Existing Manuals List */}
-            <div className="lg:col-span-2 p-6 bg-slate-800 rounded-2xl border border-slate-700 shadow-sm">
-              <h3 className="text-lg font-semibold mb-4 text-slate-200">Active Manuals</h3>
-              <div className="space-y-4">
-                {knowledgeBase.length === 0 ? (
-                  <p className="text-slate-500">No manuals found in the database.</p>
-                ) : (
-                  knowledgeBase.map((entry) => (
-                    <div key={entry.id} className="p-4 bg-slate-900 rounded-xl border border-slate-700 flex justify-between items-start gap-4">
-                      <div>
-                        <h4 className="font-semibold text-blue-400">{entry.category || `Manual #${entry.id}`}</h4>
-                        <p className="text-sm text-slate-300 mt-2 whitespace-pre-wrap">{entry.content}</p>
+                {/* 1. PDF UPLOAD ZONE WITH SUBMIT BUTTON */}
+                <div className="p-6 bg-slate-800 rounded-2xl border border-slate-700 shadow-sm flex flex-col items-center justify-center border-dashed border-2 hover:border-blue-500 transition-colors relative h-full min-h-[300px]">
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    onChange={handleFileSelect}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    disabled={isUploading}
+                  />
+
+                  {isUploading ? (
+                    <div className="text-blue-400 animate-pulse font-medium">Processing PDF...</div>
+                  ) : selectedFile ? (
+                    <div className="z-20 text-center space-y-4">
+                      <div className="p-3 bg-slate-900 rounded-xl border border-slate-700 text-sm text-slate-200">
+                        📄 <span className="font-medium">{selectedFile.name}</span> selected
                       </div>
-                      <button
-                        onClick={() => handleDeleteManual(entry.id)}
-                        className="px-3 py-1 bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 rounded transition-colors text-sm">
-                        Delete
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleConfirmUpload}
+                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-medium transition-colors">
+                          Confirm & Upload PDF
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setSelectedFile(null); }}
+                          className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl text-sm transition-colors">
+                          Cancel
+                        </button>
+                      </div>
                     </div>
-                  ))
-                )}
-              </div>
-            </div>
+                  ) : (
+                    <div className="pointer-events-none flex flex-col items-center">
+                      <svg className="w-10 h-10 text-slate-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                      <h3 className="text-sm font-semibold text-slate-200">Upload PDF Manual</h3>
+                      <p className="text-xs text-slate-500 mt-1 text-center">Click or drag a .pdf file here, then review before submitting.</p>
+                    </div>
+                  )}
+                </div>
 
+                {/* 2. MANUAL TEXT FORM */}
+                <div className="p-6 bg-slate-800 rounded-2xl border border-slate-700 shadow-sm h-full">
+                  <h3 className="text-lg font-semibold mb-4 text-slate-200">Add Manual (Typed)</h3>
+                  <form onSubmit={handleAddManual} className="space-y-4">
+                    <div>
+                      <label className="block text-sm text-slate-400 mb-1">Equipment / Category</label>
+                      <input
+                        type="text"
+                        value={newTitle}
+                        onChange={(e) => setNewTitle(e.target.value)}
+                        className="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:border-blue-500"
+                        placeholder="e.g. Conveyor Belt"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-slate-400 mb-1">Issue & Resolution Steps</label>
+                      <textarea
+                        value={newContent}
+                        onChange={(e) => setNewContent(e.target.value)}
+                        className="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 h-24 focus:outline-none focus:border-blue-500"
+                        placeholder="Describe the issue and the exact fix..."
+                        required
+                      />
+                    </div>
+                    <button type="submit" className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium transition-colors">
+                      Save to Database
+                    </button>
+                  </form>
+                </div>
+
+              </div>
+
+              {/* BOTTOM ROW: Clean Truncated Active Manuals List with Badges */}
+              <div className="p-6 bg-slate-800 rounded-2xl border border-slate-700 shadow-sm w-full">
+                <h3 className="text-lg font-semibold mb-4 text-slate-200">Active Manuals Knowledge Base</h3>
+                <div className="space-y-4 max-h-[450px] overflow-y-auto no-scrollbar">
+                  {knowledgeBase.length === 0 ? (
+                    <p className="text-slate-500">No manuals found in the database.</p>
+                  ) : (
+                    knowledgeBase.map((entry) => {
+                      const isPdfSource = entry.content && entry.content.length > 300; // heuristic or check title extension
+                      return (
+                        <div key={entry.id} className="p-4 bg-slate-900 rounded-xl border border-slate-700 flex justify-between items-center gap-4">
+                          <div className="flex items-center gap-3 overflow-hidden">
+                            <div className="truncate">
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-semibold text-slate-200 truncate">{entry.title || entry.category || `Manual #${entry.id}`}</h4>
+                                <span className={`px-2 py-0.5 text-[10px] rounded-full border ${isPdfSource ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}>
+                                  {isPdfSource ? 'PDF Upload' : 'Manual Typing'}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-400 mt-1 truncate max-w-2xl">
+                                {entry.content}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleDeleteManual(entry.id)}
+                            className="px-3 py-1.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 rounded-xl transition-colors text-sm shrink-0">
+                            Delete
+                          </button>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+            </div>
           </div>
         )}
       </main>
