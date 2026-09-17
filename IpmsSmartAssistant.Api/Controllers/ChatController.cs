@@ -74,7 +74,7 @@ CRITICAL RULE: If the question is about a recipe, poem, general coding, or casua
                     Prompt = userPrompt,
                     Response = solution,
                     LatencyMs = stopwatch.ElapsedMilliseconds,
-                    Timestamp = DateTime.UtcNow,
+                    Timestamp = DateTime.Now,
                     IsSuccessful = !solution.Contains("Error: Query out of scope")
                 };
                 _context.TelemetryLogs.Add(log);
@@ -92,7 +92,7 @@ CRITICAL RULE: If the question is about a recipe, poem, general coding, or casua
                     Prompt = userPrompt,
                     Response = $"Error: {ex.Message}",
                     LatencyMs = stopwatch.ElapsedMilliseconds,
-                    Timestamp = DateTime.UtcNow,
+                    Timestamp = DateTime.Now,
                     IsSuccessful = false
                 };
                 _context.TelemetryLogs.Add(errorLog);
