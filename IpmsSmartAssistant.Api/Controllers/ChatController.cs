@@ -23,19 +23,33 @@ namespace IpmsSmartAssistant.Api.Controllers
             _ollamaService = ollamaService;
         }
 
-        [HttpPost("ask")]
-        public async Task<IActionResult> Ask([FromForm] string prompt)
+        public class ChatRequest
         {
+            public string Prompt { get; set; } = string.Empty;
+            public string? ImageBase64 { get; set; }
+        }
+
+        [HttpPost("ask")]
+        public async Task<IActionResult> Ask([FromBody] ChatRequest request)
+        {
+            // Extract values from the incoming JSON request
+            string userPrompt = request?.Prompt ?? string.Empty;
+            string? imageBase64 = request?.ImageBase64;
             var stopwatch = Stopwatch.StartNew();
 
-            // 1. Retrieve the manual
+            // 1. Retrieve the manual (Added safety check for m.Keywords != null)
             var matchedManual = await _context.KnowledgeBaseEntries
-                .FirstOrDefaultAsync(m => prompt.ToLower().Contains(m.Keywords.ToLower()));
+                .FirstOrDefaultAsync(m => m.Keywords != null && userPrompt.ToLower().Contains(m.Keywords.ToLower()));
 
             // 2. Split the AI Prompt Logic
             string augmentedPrompt;
 
-            if (matchedManual != null)
+            if (!string.IsNullOrEmpty(imageBase64))
+            {
+                // PATH C: Image attached - Route to multi-modal vision logic
+                augmentedPrompt = $"Analyze this industrial equipment image and operator query. USER QUERY: {userPrompt}";
+            }
+            else if (matchedManual != null)
             {
                 // PATH A: Manual found. Force it to answer. Do NOT include the rejection rule.
                 augmentedPrompt = $@"You are an IPMS safety assistant. 
@@ -43,31 +57,32 @@ namespace IpmsSmartAssistant.Api.Controllers
 {matchedManual.Content}
 
 INSTRUCTION: Answer the following user question using ONLY the manual provided above. Provide a clear step-by-step list.
-USER QUESTION: {prompt}";
+USER QUESTION: {userPrompt}";
             }
             else
             {
                 // PATH B: No manual found. Apply the strict guardrail.
                 augmentedPrompt = $@"You are an IPMS industrial troubleshooting assistant. 
-USER QUESTION: {prompt}
+USER QUESTION: {userPrompt}
 
 CRITICAL RULE: If the question is about a recipe, poem, general coding, or casual chat, you MUST reply EXACTLY with: 'Error: Query out of scope. I can only assist with IPMS industrial troubleshooting.' Otherwise, answer the industrial query based on general safety.";
             }
 
             try
             {
-                // 3. Send augmented prompt to the local Ollama model
-                string solution = await _ollamaService.GenerateTroubleshootingGuideAsync(augmentedPrompt);
+                // 3. Send augmented prompt and image to the local Ollama model
+                // *CRITICAL*: Make sure GenerateTroubleshootingGuideAsync in OllamaService.cs is updated to accept the imageBase64 parameter!
+                string solution = await _ollamaService.GenerateTroubleshootingGuideAsync(augmentedPrompt, imageBase64);
                 stopwatch.Stop();
 
                 // 4. Log the telemetry
                 var log = new TelemetryLog
                 {
-                    Prompt = prompt,
+                    Prompt = userPrompt,
                     Response = solution,
                     LatencyMs = stopwatch.ElapsedMilliseconds,
                     Timestamp = DateTime.UtcNow,
-                    IsSuccessful = true
+                    IsSuccessful = !solution.Contains("Error: Query out of scope")
                 };
                 _context.TelemetryLogs.Add(log);
                 await _context.SaveChangesAsync();
@@ -81,7 +96,7 @@ CRITICAL RULE: If the question is about a recipe, poem, general coding, or casua
                 // Log failed attempt
                 var errorLog = new TelemetryLog
                 {
-                    Prompt = prompt,
+                    Prompt = userPrompt,
                     Response = $"Error: {ex.Message}",
                     LatencyMs = stopwatch.ElapsedMilliseconds,
                     Timestamp = DateTime.UtcNow,
@@ -154,6 +169,12 @@ CRITICAL RULE: If the question is about a recipe, poem, general coding, or casua
             return Ok(new { summary = summaryResponse });
         }
 
+    }
+
+    public class ChatRequest
+    {
+        public string Prompt { get; set; } = string.Empty;
+        public string? ImageBase64 { get; set; }
     }
 
 
