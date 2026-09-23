@@ -31,35 +31,97 @@ namespace IpmsSmartAssistant.Api.Controllers
             string? imageBase64 = request?.ImageBase64;
             var stopwatch = Stopwatch.StartNew();
 
-            // 1. Retrieve the manual (with safety check for null keywords)
-            var matchedManual = await _context.KnowledgeBaseEntries
-                .FirstOrDefaultAsync(m => m.Keywords != null && userPrompt.ToLower().Contains(m.Keywords.ToLower()));
+            // Ask AI to translate the Malay prompt into English keywords for better matching
+            string translationPrompt = $"You are an industrial translator. Extract the core equipment name and issue from this query and translate it to simple English keywords. Respond ONLY with the English keywords, no explanations. QUERY: {userPrompt}";
+            string englishKeywords = await _ollamaService.GenerateTroubleshootingGuideAsync(translationPrompt, null);
+
+            // Combine the original Malay prompt with the English AI translation
+            string combinedSearchTerms = userPrompt.ToLower() + " " + englishKeywords.ToLower();
+
+
+            // 1. Retrieve all manuals for in-memory fuzzy matching
+            var allManuals = await _context.KnowledgeBaseEntries.ToListAsync();
+            KnowledgeBaseEntry matchedManual = null;
+            int highestScore = 0;
+
+            // Clean and split the COMBINED text into searchable words
+            var promptWords = combinedSearchTerms
+                .Split(new[] { ' ', '?', '.', ',', '!', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
+                .Where(w => w.Length >= 4); // Only look at substantial words
+
+            foreach (var manual in allManuals)
+            {
+                int currentScore = 0;
+
+                string titleSafe = manual.Title ?? "";
+                string keywordSafe = manual.Keywords ?? "";
+                var searchableText = (titleSafe + " " + keywordSafe).ToLower();
+
+                var titleWords = searchableText.Split(new[] { ' ', '?', '.', ',' }, StringSplitOptions.RemoveEmptyEntries);
+
+                foreach (var pWord in promptWords)
+                {
+                    foreach (var tWord in titleWords)
+                    {
+                        if (tWord == pWord)
+                        {
+                            currentScore += 10;
+                        }
+                        else if (tWord.Contains(pWord) || pWord.Contains(tWord))
+                        {
+                            currentScore += 5;
+                        }
+                        else if (tWord.Length >= 4 && pWord.Substring(0, 4) == tWord.Substring(0, 4))
+                        {
+                            currentScore += 3;
+                        }
+                    }
+                }
+
+                if (currentScore > highestScore)
+                {
+                    highestScore = currentScore;
+                    matchedManual = manual;
+                }
+            }
+
+            if (highestScore < 3)
+            {
+                matchedManual = null;
+            }
 
             // 2. Split the AI Prompt Logic
             string augmentedPrompt;
 
             if (!string.IsNullOrEmpty(imageBase64))
             {
-                // PATH C: Image attached - Route to multi-modal vision logic
-                augmentedPrompt = $"Analyze this industrial equipment image and operator query. USER QUERY: {userPrompt}";
+                // PATH C: Image attached
+                augmentedPrompt = $"Analyze this industrial equipment image and operator query. CRITICAL RULE: You must reply entirely in the exact same language the user is speaking. USER QUERY: {userPrompt}";
             }
             else if (matchedManual != null)
             {
-                // PATH A: Manual found. Force it to answer. Do NOT include the rejection rule.
+                // PATH A: Manual found. Force strict translation at the end of the prompt.
                 augmentedPrompt = $@"You are an IPMS safety assistant. 
+
 [OFFICIAL MANUAL: {matchedManual.Title}]
 {matchedManual.Content}
 
-INSTRUCTION: Answer the following user question using ONLY the manual provided above. Provide a clear step-by-step list.
+CRITICAL INSTRUCTIONS:
+1. Answer the user's question using ONLY the manual provided above. Provide a clear step-by-step list.
+2. You MUST detect the language of the USER QUESTION below. 
+3. TRANSLATE your entire response into that exact same language. If the user asks in Bahasa Melayu, you MUST reply 100% in Bahasa Melayu.
+
 USER QUESTION: {userPrompt}";
             }
             else
             {
                 // PATH B: No manual found. Apply the strict guardrail.
                 augmentedPrompt = $@"You are an IPMS industrial troubleshooting assistant. 
-USER QUESTION: {userPrompt}
 
-CRITICAL RULE: If the question is about a recipe, poem, general coding, or casual chat, you MUST reply EXACTLY with: 'Error: Query out of scope. I can only assist with IPMS industrial troubleshooting.' Otherwise, answer the industrial query based on general safety.";
+CRITICAL RULE: If the question is about a recipe, poem, general coding, or casual chat, you MUST reply EXACTLY with: 'Error: Query out of scope.' (Translate this error to the user's language). 
+Otherwise, answer the industrial query based on general safety. ALWAYS reply in the exact same language as the USER QUESTION.
+
+USER QUESTION: {userPrompt}";
             }
 
             try
@@ -75,7 +137,7 @@ CRITICAL RULE: If the question is about a recipe, poem, general coding, or casua
                     Response = solution,
                     LatencyMs = stopwatch.ElapsedMilliseconds,
                     Timestamp = DateTime.Now,
-                    IsSuccessful = !solution.Contains("Error: Query out of scope")
+                    IsSuccessful = !solution.Contains("Error: Query out of scope") && !solution.Contains("Query out of scope")
                 };
                 _context.TelemetryLogs.Add(log);
                 await _context.SaveChangesAsync();
@@ -86,7 +148,6 @@ CRITICAL RULE: If the question is about a recipe, poem, general coding, or casua
             {
                 stopwatch.Stop();
 
-                // Log failed attempt
                 var errorLog = new TelemetryLog
                 {
                     Prompt = userPrompt,

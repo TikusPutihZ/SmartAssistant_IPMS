@@ -205,3 +205,4 @@ C:\SmartAssistant_IPMS\IpmsSmartAssistant.Api\bin\Debug\net10.0\UglyToad.PdfPig.
 C:\SmartAssistant_IPMS\IpmsSmartAssistant.Api\bin\Debug\net10.0\UglyToad.PdfPig.Fonts.dll
 C:\SmartAssistant_IPMS\IpmsSmartAssistant.Api\bin\Debug\net10.0\UglyToad.PdfPig.Tokenization.dll
 C:\SmartAssistant_IPMS\IpmsSmartAssistant.Api\bin\Debug\net10.0\UglyToad.PdfPig.Tokens.dll
+C:\SmartAssistant_IPMS\IpmsSmartAssistant.Api\bin\Debug\net10.0\IpmsSmartAssistant.Api.staticwebassets.runtime.json

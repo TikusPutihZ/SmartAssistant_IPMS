@@ -71,32 +71,36 @@ namespace IpmsSmartAssistant.Api.Controllers
 
             try
             {
-                // 1. Read the uploaded file stream
+                // 1. NEW: Save the actual PDF file to the server so the browser can view it
+                var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "manuals");
+                Directory.CreateDirectory(uploadsFolder); // Creates folder if it doesn't exist
+                
+                var filePath = Path.Combine(uploadsFolder, file.FileName);
+                using (var fileStream = new FileStream(filePath, FileMode.Create))
+                {
+                    await file.CopyToAsync(fileStream);
+                }
+
+                // 2. EXISTING: Open the PDF stream to extract text for the AI RAG
                 using var stream = file.OpenReadStream();
-
-                // 2. Open the PDF securely offline
                 using var document = PdfDocument.Open(stream);
-
                 var extractedText = new System.Text.StringBuilder();
 
-                // 3. Loop through pages and extract text
                 foreach (var page in document.GetPages())
                 {
                     extractedText.AppendLine(page.Text);
                 }
 
-                // 4. Save to the database 
-                // Note: In a production RAG system, you would "chunk" this text into smaller paragraphs here.
-                var newEntry = new KnowledgeBaseEntry
-                {
-                    Title = file.FileName.Replace(".pdf", ""), // Use filename as the equipment name
-                    Content = extractedText.ToString()
+                var newEntry = new KnowledgeBaseEntry 
+                { 
+                    Title = file.FileName.Replace(".pdf", ""), 
+                    Content = extractedText.ToString() 
                 };
 
                 _context.KnowledgeBaseEntries.Add(newEntry);
                 await _context.SaveChangesAsync();
 
-                return Ok(new { message = "PDF processed and knowledge updated successfully!" });
+                return Ok(new { message = "PDF processed and saved successfully!" });
             }
             catch (Exception ex)
             {
