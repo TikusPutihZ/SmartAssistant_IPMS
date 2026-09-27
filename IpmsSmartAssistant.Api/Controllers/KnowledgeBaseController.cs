@@ -62,7 +62,7 @@ namespace IpmsSmartAssistant.Api.Controllers
         // POST: api/knowledgebase/upload
         // Parses an uploaded PDF and feeds the text to the RAG database
         [HttpPost("upload")]
-        public async Task<IActionResult> UploadPdf(IFormFile file)
+        public async Task<IActionResult> UploadPdf([FromForm] IFormFile file, [FromForm] string keywords = "")
         {
             if (file == null || file.Length == 0 || file.ContentType != "application/pdf")
             {
@@ -74,7 +74,7 @@ namespace IpmsSmartAssistant.Api.Controllers
                 // 1. NEW: Save the actual PDF file to the server so the browser can view it
                 var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "manuals");
                 Directory.CreateDirectory(uploadsFolder); // Creates folder if it doesn't exist
-                
+
                 var filePath = Path.Combine(uploadsFolder, file.FileName);
                 using (var fileStream = new FileStream(filePath, FileMode.Create))
                 {
@@ -91,10 +91,11 @@ namespace IpmsSmartAssistant.Api.Controllers
                     extractedText.AppendLine(page.Text);
                 }
 
-                var newEntry = new KnowledgeBaseEntry 
-                { 
+                var newEntry = new KnowledgeBaseEntry
+                {
                     Title = file.FileName.Replace(".pdf", ""), 
-                    Content = extractedText.ToString() 
+                    Content = extractedText.ToString(),
+                    Keywords = keywords
                 };
 
                 _context.KnowledgeBaseEntries.Add(newEntry);

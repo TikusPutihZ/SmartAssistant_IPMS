@@ -11,6 +11,7 @@ export default function AdminDashboard() {
   const [knowledgeBase, setKnowledgeBase] = useState([]);
   const [newTitle, setNewTitle] = useState('');
   const [newContent, setNewContent] = useState('');
+  const [pdfKeywords, setPdfKeywords] = useState('');
 
   // Fetch manuals when switching to the Knowledge tab
   const fetchKnowledgeBase = async () => {
@@ -74,6 +75,7 @@ export default function AdminDashboard() {
     setIsUploading(true);
     const formData = new FormData();
     formData.append("file", selectedFile);
+    formData.append('keywords', pdfKeywords);
 
     try {
       const res = await fetch('http://localhost:5268/api/knowledgebase/upload', {
@@ -83,6 +85,7 @@ export default function AdminDashboard() {
 
       if (res.ok) {
         setSelectedFile(null); // Clear selection
+        setPdfKeywords('');
         fetchKnowledgeBase(); // Refresh list
       } else {
         console.error("Upload failed");
@@ -274,43 +277,66 @@ export default function AdminDashboard() {
               {/* TOP ROW: Upload and Form */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-                {/* 1. PDF UPLOAD ZONE WITH SUBMIT BUTTON */}
-                <div className="p-6 bg-slate-800 rounded-2xl border border-slate-700 shadow-sm flex flex-col items-center justify-center border-dashed border-2 hover:border-blue-500 transition-colors relative h-full min-h-[300px]">
-                  <input
-                    type="file"
-                    accept="application/pdf"
-                    onChange={handleFileSelect}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                    disabled={isUploading}
-                  />
+                {/* 1. PDF UPLOAD CARD */}
+                <div className="p-6 bg-slate-800 rounded-2xl border border-slate-700 shadow-sm flex flex-col h-full">
+                  <h3 className="text-lg font-semibold mb-4 text-slate-200">Upload PDF Manual</h3>
 
-                  {isUploading ? (
-                    <div className="text-blue-400 animate-pulse font-medium">Processing PDF...</div>
-                  ) : selectedFile ? (
-                    <div className="z-20 text-center space-y-4">
-                      <div className="p-3 bg-slate-900 rounded-xl border border-slate-700 text-sm text-slate-200">
-                        📄 <span className="font-medium">{selectedFile.name}</span> selected
-                      </div>
-                      <div className="flex gap-2">
+                  <div className="flex-1 flex flex-col gap-4">
+                    {/* Dedicated Dashed Dropzone */}
+                    <div className="relative flex-1 flex flex-col items-center justify-center border-dashed border-2 border-slate-600 hover:border-blue-500 bg-slate-900/50 rounded-xl transition-colors min-h-[160px]">
+                      <input
+                        type="file"
+                        accept="application/pdf"
+                        onChange={handleFileSelect}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                        disabled={isUploading}
+                      />
+
+                      {isUploading ? (
+                        <div className="text-blue-400 animate-pulse font-medium">Processing PDF...</div>
+                      ) : selectedFile ? (
+                        <div className="z-20 text-center pointer-events-none">
+                          <div className="p-3 bg-slate-800 rounded-xl border border-slate-500 text-sm text-slate-200 shadow-lg">
+                            📄 <span className="font-medium text-blue-400">{selectedFile.name}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="pointer-events-none flex flex-col items-center p-4">
+                          <svg className="w-10 h-10 text-slate-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                          <h3 className="text-sm font-semibold text-slate-200">Select PDF File</h3>
+                          <p className="text-xs text-slate-500 mt-1 text-center">Click or drag a .pdf file here</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Cleanly Labeled Keyword Input */}
+                    <div>
+                      <label className="block text-sm text-slate-400 mb-1">Detection Keywords</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. login, password, latency"
+                        value={pdfKeywords}
+                        onChange={(e) => setPdfKeywords(e.target.value)}
+                        className="w-full p-3 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    {/* Action Buttons (Only appear when a file is ready) */}
+                    {selectedFile && !isUploading && (
+                      <div className="flex gap-2 mt-2 pt-2 border-t border-slate-700/50">
                         <button
                           onClick={handleConfirmUpload}
-                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-medium transition-colors">
-                          Confirm & Upload PDF
+                          className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-medium transition-colors shadow-sm">
+                          Confirm & Upload
                         </button>
                         <button
-                          onClick={(e) => { e.stopPropagation(); setSelectedFile(null); }}
-                          className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl text-sm transition-colors">
+                          onClick={() => { setSelectedFile(null); setPdfKeywords(''); }}
+                          className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl text-sm transition-colors shadow-sm">
                           Cancel
                         </button>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="pointer-events-none flex flex-col items-center">
-                      <svg className="w-10 h-10 text-slate-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
-                      <h3 className="text-sm font-semibold text-slate-200">Upload PDF Manual</h3>
-                      <p className="text-xs text-slate-500 mt-1 text-center">Click or drag a .pdf file here, then review before submitting.</p>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
 
                 {/* 2. MANUAL TEXT FORM */}

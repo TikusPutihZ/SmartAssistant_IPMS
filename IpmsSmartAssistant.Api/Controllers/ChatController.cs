@@ -95,8 +95,21 @@ namespace IpmsSmartAssistant.Api.Controllers
 
             if (!string.IsNullOrEmpty(imageBase64))
             {
-                // PATH C: Image attached
-                augmentedPrompt = $"Analyze this industrial equipment image and operator query. CRITICAL RULE: You must reply entirely in the exact same language the user is speaking. USER QUERY: {userPrompt}";
+                // PATH C: Multi-modal Vision + RAG Guidance
+                string manualContext = matchedManual != null
+                    ? $"[REFERENCE MANUAL: {matchedManual.Title}]\n{matchedManual.Content}\n"
+                    : "";
+
+                augmentedPrompt = $@"You are an expert IPMS industrial diagnostic technician specializing in visual inspection and equipment safety.
+
+{manualContext}
+INSTRUCTIONS:
+1. Examine the attached equipment image closely (check needle positions, gauge values, warning markers, wear, or physical faults).
+2. Answer the operator query directly using your visual findings and the provided reference manual (if present).
+3. Clearly state whether the gauge/equipment appears normal or abnormal, and provide the exact step-by-step resolution.
+4. STRICT LANGUAGE ENFORCEMENT: Reply in the exact same language as the USER QUERY.
+
+USER QUERY: {userPrompt}";
             }
             else if (matchedManual != null)
             {
@@ -131,9 +144,13 @@ USER QUESTION: {userPrompt}";
                 stopwatch.Stop();
 
                 // 4. Log the telemetry
+
+                string cleanKeywords = englishKeywords.Replace("\n", " ").Trim().ToLower();
+                string mainProblemLabel = System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(cleanKeywords);
+
                 var log = new TelemetryLog
                 {
-                    Prompt = userPrompt,
+                    Prompt = mainProblemLabel,
                     Response = solution,
                     LatencyMs = stopwatch.ElapsedMilliseconds,
                     Timestamp = DateTime.Now,
@@ -148,9 +165,12 @@ USER QUESTION: {userPrompt}";
             {
                 stopwatch.Stop();
 
+                string cleanKeywords = englishKeywords.Replace("\n", " ").Trim().ToLower();
+                string mainProblemLabel = System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(cleanKeywords);
+
                 var errorLog = new TelemetryLog
                 {
-                    Prompt = userPrompt,
+                    Prompt = mainProblemLabel,
                     Response = $"Error: {ex.Message}",
                     LatencyMs = stopwatch.ElapsedMilliseconds,
                     Timestamp = DateTime.Now,
