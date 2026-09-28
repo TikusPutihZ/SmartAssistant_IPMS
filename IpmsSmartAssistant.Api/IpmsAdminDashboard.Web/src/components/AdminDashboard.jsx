@@ -13,6 +13,7 @@ export default function AdminDashboard() {
   const [newContent, setNewContent] = useState('');
   const [pdfKeywords, setPdfKeywords] = useState('');
   const [timeFilter, setTimeFilter] = useState('all');
+  const [selectedViewManual, setSelectedViewManual] = useState(null);
 
   // Fetch manuals when switching to the Knowledge tab
   const fetchKnowledgeBase = async () => {
@@ -433,9 +434,13 @@ export default function AdminDashboard() {
                     <p className="text-slate-500">No manuals found in the database.</p>
                   ) : (
                     knowledgeBase.map((entry) => {
-                      const isPdfSource = entry.content && entry.content.length > 300; // heuristic or check title extension
+                      const isPdfSource = entry.content && entry.content.length > 300;
                       return (
-                        <div key={entry.id} className="p-4 bg-slate-900 rounded-xl border border-slate-700 flex justify-between items-center gap-4">
+                        <div
+                          key={entry.id}
+                          onClick={() => setSelectedViewManual(entry)} // <-- Opens the modal
+                          className="p-4 bg-slate-900 hover:bg-slate-800/80 rounded-xl border border-slate-700 flex justify-between items-center gap-4 cursor-pointer transition-colors"
+                        >
                           <div className="flex items-center gap-3 overflow-hidden">
                             <div className="truncate">
                               <div className="flex items-center gap-2">
@@ -450,7 +455,7 @@ export default function AdminDashboard() {
                             </div>
                           </div>
                           <button
-                            onClick={() => handleDeleteManual(entry.id)}
+                            onClick={(e) => { e.stopPropagation(); handleDeleteManual(entry.id); }} // <-- Prevents modal from opening when deleting
                             className="px-3 py-1.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 rounded-xl transition-colors text-sm shrink-0">
                             Delete
                           </button>
@@ -465,6 +470,51 @@ export default function AdminDashboard() {
           </div>
         )}
       </main>
+      {/* VIEW MANUAL OVERLAY MODAL */}
+        {selectedViewManual && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col">
+              
+              {/* Modal Header */}
+              <div className="p-6 border-b border-slate-700 flex justify-between items-center bg-slate-900/50 rounded-t-2xl">
+                <h3 className="text-xl font-bold text-slate-100">{selectedViewManual.title || selectedViewManual.category}</h3>
+                <button onClick={() => setSelectedViewManual(null)} className="text-slate-400 hover:text-white transition-colors">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+              </div>
+              
+              {/* Modal Body (Extracted AI Text) */}
+              <div className="p-6 overflow-y-auto whitespace-pre-wrap text-slate-300 text-sm leading-relaxed font-mono bg-slate-900/30">
+                {selectedViewManual.content}
+              </div>
+              
+              {/* Modal Footer */}
+              <div className="p-4 border-t border-slate-700 bg-slate-900/50 rounded-b-2xl flex justify-between items-center">
+                {/* Only show the 'View Original PDF' button if it's a PDF upload */}
+                {selectedViewManual.content && selectedViewManual.content.length > 300 ? (
+                  <a 
+                    href={`http://localhost:5268/api/knowledgebase/pdf/${selectedViewManual.title}.pdf`} 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="text-blue-400 hover:text-blue-300 text-sm font-medium flex items-center gap-2 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                    View Original PDF
+                  </a>
+                ) : (
+                  <div></div>
+                )}
+                
+                <button 
+                  onClick={() => setSelectedViewManual(null)} 
+                  className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium transition-colors shadow-sm"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   );
 }

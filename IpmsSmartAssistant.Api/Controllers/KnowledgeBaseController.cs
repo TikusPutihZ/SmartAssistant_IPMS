@@ -73,7 +73,10 @@ namespace IpmsSmartAssistant.Api.Controllers
             {
                 // 1. NEW: Save the actual PDF file to the server so the browser can view it
                 var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "manuals");
-                Directory.CreateDirectory(uploadsFolder); // Creates folder if it doesn't exist
+                if (!Directory.Exists(uploadsFolder)) 
+                {
+                    Directory.CreateDirectory(uploadsFolder);
+                } // Creates folder if it doesn't exist
 
                 var filePath = Path.Combine(uploadsFolder, file.FileName);
                 using (var fileStream = new FileStream(filePath, FileMode.Create))
@@ -107,6 +110,23 @@ namespace IpmsSmartAssistant.Api.Controllers
             {
                 return StatusCode(500, new { message = "Error processing PDF: " + ex.Message });
             }
+        }
+
+        [HttpGet("pdf/{fileName}")]
+        public IActionResult GetPdf(string fileName)
+        {
+            // FIX: Point to the exact "wwwroot/manuals" folder where the PDF was actually saved
+            var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "manuals", fileName);
+
+            // If the file isn't on the hard drive, return a 404
+            if (!System.IO.File.Exists(filePath))
+            {
+                return NotFound($"The PDF '{fileName}' could not be found on the server.");
+            }
+
+            // Open the file and send it back to React as a viewable PDF
+            var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
+            return File(fileStream, "application/pdf");
         }
     }
 }

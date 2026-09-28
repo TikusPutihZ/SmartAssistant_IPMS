@@ -32,8 +32,27 @@ namespace IpmsSmartAssistant.Api.Controllers
             var stopwatch = Stopwatch.StartNew();
 
             // Ask AI to translate the Malay prompt into English keywords for better matching
-            string translationPrompt = $"You are an industrial translator. Extract the core equipment name and issue from this query and translate it to simple English keywords. Respond ONLY with the English keywords, no explanations. QUERY: {userPrompt}";
+            string translationPrompt = $@"Extract the main problem from the query in exactly 2 to 4 words. 
+DO NOT use labels like 'Equipment:' or 'Issue:'. 
+DO NOT write sentences. 
+
+Examples:
+Query: 'macam mana nak baiki tali sawat' -> Conveyor Belt Alignment
+Query: 'saya x bole nak login website' -> Login Error
+Query: 'pressure gauge is at 0' -> Boiler Pressure Fault
+
+Query: '{userPrompt}' ->";
+
             string englishKeywords = await _ollamaService.GenerateTroubleshootingGuideAsync(translationPrompt, null);
+
+            // Failsafe: Strip out any labels if the AI still tries to be chatty
+            englishKeywords = englishKeywords
+                .Replace("Core Equipment Name:", "")
+                .Replace("Core equipment:", "")
+                .Replace("Issue:", "")
+                .Replace("None", "")
+                .Replace("N/A", "")
+                .Trim();
 
             // Combine the original Malay prompt with the English AI translation
             string combinedSearchTerms = userPrompt.ToLower() + " " + englishKeywords.ToLower();
