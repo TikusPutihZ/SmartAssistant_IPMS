@@ -12,6 +12,7 @@ export default function AdminDashboard() {
   const [newTitle, setNewTitle] = useState('');
   const [newContent, setNewContent] = useState('');
   const [pdfKeywords, setPdfKeywords] = useState('');
+  const [timeFilter, setTimeFilter] = useState('all');
 
   // Fetch manuals when switching to the Knowledge tab
   const fetchKnowledgeBase = async () => {
@@ -122,9 +123,43 @@ export default function AdminDashboard() {
   }, []);
 
   // Group logs by prompt and count them for the chart
+  // ==========================================
+  // 1. FILTER LOGS BY SELECTED TIME RANGE
+  // ==========================================
+  const now = new Date();
+  const filteredLogs = logs.filter(log => {
+    if (timeFilter === 'all') return true;
+
+    const logDate = new Date(log.timestamp);
+    const diffTime = Math.abs(now - logDate);
+    const diffDays = diffTime / (1000 * 60 * 60 * 24); // Convert ms to days
+
+    if (timeFilter === '1d') return diffDays <= 1;
+    if (timeFilter === '7d') return diffDays <= 7;
+    if (timeFilter === '30d') return diffDays <= 30;
+    return true;
+  });
+
+  // ==========================================
+  // 2. DYNAMICALLY CALCULATE STATS
+  // ==========================================
+  const dynamicTotalQueries = filteredLogs.length;
+  const dynamicBlockedAttempts = filteredLogs.filter(log => log.response.includes("Error: Query out of scope")).length;
+
+  // Find the most frequent issue in the filtered time frame
+  const issueCounts = {};
+  filteredLogs.forEach(log => {
+    issueCounts[log.prompt] = (issueCounts[log.prompt] || 0) + 1;
+  });
+  const dynamicTopIssue = Object.keys(issueCounts).length > 0
+    ? Object.keys(issueCounts).reduce((a, b) => issueCounts[a] > issueCounts[b] ? a : b)
+    : '--';
+
+  // ==========================================
+  // 3. GENERATE CHART DATA FROM FILTERED LOGS
+  // ==========================================
   const chartData = Object.values(
-    logs.reduce((acc, log) => {
-      // Shorten long prompts so they fit nicely on the chart axis
+    filteredLogs.reduce((acc, log) => {
       const topic = log.prompt.length > 25 ? log.prompt.substring(0, 25) + '...' : log.prompt;
       if (!acc[topic]) {
         acc[topic] = { name: topic, count: 0 };
@@ -132,7 +167,7 @@ export default function AdminDashboard() {
       acc[topic].count += 1;
       return acc;
     }, {})
-  ).sort((a, b) => b.count - a.count).slice(0, 5); // Keep the top 5 most common
+  ).sort((a, b) => b.count - a.count).slice(0, 5);
 
   return (
     <div className="flex h-screen bg-slate-900 text-slate-100 font-sans overflow-hidden">
@@ -164,25 +199,43 @@ export default function AdminDashboard() {
 
         {activeTab === 'overview' && (
           <>
-            <header className="mb-8">
-              <h2 className="text-3xl font-bold text-slate-100">Dashboard Overview</h2>
-              <p className="text-slate-400 mt-1">Real-time equipment telemetry and AI guardrail monitoring.</p>
+            <header className="mb-8 flex justify-between items-end">
+              <div>
+                <h2 className="text-3xl font-bold text-slate-100">Dashboard Overview</h2>
+                <p className="text-slate-400 mt-1">Real-time equipment telemetry and AI guardrail monitoring.</p>
+              </div>
+
+              {/* NEW: Time Range Toggle Buttons */}
+              <div className="flex bg-slate-800 rounded-lg p-1 border border-slate-700 shadow-sm">
+                {['1d', '7d', '30d', 'all'].map(filter => (
+                  <button
+                    key={filter}
+                    onClick={() => setTimeFilter(filter)}
+                    className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${timeFilter === filter
+                      ? 'bg-blue-600 text-white shadow'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                      }`}
+                  >
+                    {filter === '1d' ? '24 Hours' : filter === '7d' ? '7 Days' : filter === '30d' ? '30 Days' : 'All Time'}
+                  </button>
+                ))}
+              </div>
             </header>
 
             {/* Stat Cards Row */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               <div className="p-6 bg-slate-800 rounded-2xl border border-slate-700 shadow-sm">
                 <h3 className="text-slate-400 text-sm font-medium mb-2">Total Queries</h3>
-                <p className="text-3xl font-bold text-slate-100">{stats.totalQueries}</p>
+                <p className="text-3xl font-bold text-slate-100">{dynamicTotalQueries}</p>
               </div>
               <div className="p-6 bg-slate-800 rounded-2xl border border-slate-700 shadow-sm">
                 <h3 className="text-slate-400 text-sm font-medium mb-2">Blocked Attempts</h3>
-                <p className="text-3xl font-bold text-red-400">{stats.blockedAttempts}</p>
+                <p className="text-3xl font-bold text-red-400">{dynamicBlockedAttempts}</p>
               </div>
               <div className="p-6 bg-slate-800 rounded-2xl border border-slate-700 shadow-sm">
                 <h3 className="text-slate-400 text-sm font-medium mb-2">Top Issue</h3>
-                <p className="text-xl font-bold text-emerald-400 truncate" title={stats.topIssue}>
-                  {stats.topIssue}
+                <p className="text-xl font-bold text-emerald-400 truncate" title={dynamicTopIssue}>
+                  {dynamicTopIssue}
                 </p>
               </div>
             </div>
@@ -243,7 +296,7 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-700/50">
-                      {logs.map((log) => (
+                      {filteredLogs.map((log) => (
                         <tr key={log.id} className="hover:bg-slate-700/30 transition-colors">
                           <td className="p-4 whitespace-nowrap">{new Date(log.timestamp).toLocaleString()}</td>
                           <td className="p-4 max-w-md truncate" title={log.prompt}>{log.prompt}</td>
