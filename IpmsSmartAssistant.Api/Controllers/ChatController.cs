@@ -207,7 +207,6 @@ USER QUESTION: {userPrompt}";
         {
             var logs = await _context.TelemetryLogs
                 .OrderByDescending(l => l.Timestamp)
-                .Take(10)
                 .ToListAsync();
 
             return Ok(logs);
