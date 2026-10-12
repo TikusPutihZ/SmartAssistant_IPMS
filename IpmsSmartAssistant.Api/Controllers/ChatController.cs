@@ -155,15 +155,15 @@ USER QUERY: {userPrompt}";
             else if (matchedManual != null)
             {
                 // PATH A: Manual found. Force strict translation at the end of the prompt.
-                augmentedPrompt = $@"You are an IPMS safety assistant. 
+                augmentedPrompt = $@"You are a professional IPMS safety and diagnostic AI assistant.
 
 [OFFICIAL MANUAL: {matchedManual.Title}]
 {matchedManual.Content}
 
 CRITICAL INSTRUCTIONS:
-1. Answer the user's question using ONLY the manual provided above. Provide a clear step-by-step list.
-2. You MUST detect the language of the USER QUESTION below. 
-3. TRANSLATE your entire response into that exact same language. If the user asks in Bahasa Melayu, you MUST reply 100% in Bahasa Melayu.
+1. If the user asks a technical or diagnostic question, answer using ONLY the manual provided above. Provide a clear step-by-step list.
+2. If the user is simply saying 'thank you', 'okay', acknowledging an answer, or greeting you, respond naturally and politely as a friendly AI assistant. DO NOT provide a step-by-step list.
+3. STRICT LANGUAGE ENFORCEMENT: You must reply ONLY in the exact same language as the USER QUESTION OR if the user provides a language preference. DO NOT provide bilingual answers.
 
 {chatContext}
 USER QUESTION: {userPrompt}";
@@ -171,10 +171,12 @@ USER QUESTION: {userPrompt}";
             else
             {
                 // PATH B: No manual found. Apply the strict guardrail.
-                augmentedPrompt = $@"You are an IPMS industrial troubleshooting assistant. 
+                augmentedPrompt = $@"You are a professional IPMS industrial troubleshooting AI assistant.
 
-CRITICAL RULE: If the question is about a recipe, poem, general coding, or casual chat, you MUST reply EXACTLY with: 'Error: Query out of scope.' (Translate this error to the user's language). 
-Otherwise, answer the industrial query based on general safety. ALWAYS reply in the exact same language as the USER QUESTION.
+CRITICAL RULE: 
+1. If the question is about a recipe, poem, general coding, or completely unrelated topics, you MUST reply EXACTLY with: 'Error: Query out of scope.' (Translate this to the user's language).
+2. If the user is simply greeting you, saying 'thank you', or acknowledging an answer, respond naturally and politely.
+3. ALWAYS reply in the exact same language as the USER QUESTION.
 
 {chatContext}
 USER QUESTION: {userPrompt}";
@@ -186,21 +188,23 @@ USER QUESTION: {userPrompt}";
                 string solution = await _ollamaService.GenerateTroubleshootingGuideAsync(augmentedPrompt, imageBase64);
                 stopwatch.Stop();
 
-                // 4. Log the telemetry
-
-                string cleanKeywords = englishKeywords.Replace("\n", " ").Trim().ToLower();
-                string mainProblemLabel = System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(cleanKeywords);
-
-                var log = new TelemetryLog
+                // 4. Log the telemetry ONLY if it's the first question in the chat
+                if (request.History == null || request.History.Count == 0)
                 {
-                    Prompt = mainProblemLabel,
-                    Response = solution,
-                    LatencyMs = stopwatch.ElapsedMilliseconds,
-                    Timestamp = DateTime.Now,
-                    IsSuccessful = !solution.Contains("Error: Query out of scope") && !solution.Contains("Query out of scope")
-                };
-                _context.TelemetryLogs.Add(log);
-                await _context.SaveChangesAsync();
+                    string cleanKeywords = englishKeywords.Replace("\n", " ").Trim().ToLower();
+                    string mainProblemLabel = System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(cleanKeywords);
+
+                    var log = new TelemetryLog
+                    {
+                        Prompt = mainProblemLabel,
+                        Response = solution,
+                        LatencyMs = stopwatch.ElapsedMilliseconds,
+                        Timestamp = DateTime.Now,
+                        IsSuccessful = !solution.Contains("Error: Query out of scope") && !solution.Contains("Query out of scope")
+                    };
+                    _context.TelemetryLogs.Add(log);
+                    await _context.SaveChangesAsync();
+                }
 
                 return Ok(new { solution = solution, latency = $"{stopwatch.ElapsedMilliseconds} ms" });
             }
