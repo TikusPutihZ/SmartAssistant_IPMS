@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("IpmsSmartAssistant.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0b3b1f78bc33503db01bac66758fa59902809afb")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+bad8cc17adcf29dba64841db986f6efdc3be1650")]
 [assembly: System.Reflection.AssemblyProductAttribute("IpmsSmartAssistant.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("IpmsSmartAssistant.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

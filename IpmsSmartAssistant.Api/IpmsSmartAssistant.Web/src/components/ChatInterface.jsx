@@ -5,11 +5,11 @@ export default function ChatInterface() {
   const [input, setInput] = useState('');
   const [selectedImage, setSelectedImage] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  
+
   // New States for the Sidebar
   const [manuals, setManuals] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   const fileInputRef = useRef(null);
 
   // 1. Fetch the manuals when the page loads
@@ -21,7 +21,7 @@ export default function ChatInterface() {
   }, []);
 
   // 2. Filter manuals based on search bar
-  const filteredManuals = manuals.filter(m => 
+  const filteredManuals = manuals.filter(m =>
     (m.title || m.category || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -76,23 +76,31 @@ export default function ChatInterface() {
 
     const userMessage = { role: 'user', content: input, image: selectedImage };
     setMessages(prev => [...prev, userMessage]);
-    
+
     const currentInput = input;
     const currentImage = selectedImage;
     setInput('');
     setSelectedImage(null);
     setIsLoading(true);
 
+    // 1. Format existing messages to match C#'s MessageHistory model
+    const formattedHistory = messages.map(msg => ({
+      role: msg.role === 'user' ? 'user' : 'ai',
+      content: msg.content
+    }));
+
     try {
       const res = await fetch('http://localhost:5268/api/chat/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          prompt: currentInput, 
-          imageBase64: currentImage ? currentImage.split(',')[1] : null 
+        body: JSON.stringify({
+          prompt: currentInput,
+          imageBase64: currentImage ? currentImage.split(',')[1] : null,
+          history: formattedHistory // <--- History successfully added here!
         })
       });
 
+      // DO NOT DELETE: This is what actually prints the AI's answer to the screen!
       if (res.ok) {
         const data = await res.json();
         setMessages(prev => [...prev, { role: 'assistant', content: data.solution }]);
@@ -109,15 +117,15 @@ export default function ChatInterface() {
 
   return (
     <div className="flex h-screen bg-[#131314] text-[#E3E3E3] font-sans overflow-hidden">
-      
+
       {/* Left Sidebar (Gemini Style) */}
       <aside className="w-64 bg-[#1e1f20] border-r border-[#2d2e30] flex flex-col p-4 hidden md:flex">
         <div className="flex items-center gap-3 mb-8 px-2">
           <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-500 flex items-center justify-center font-bold text-white">AI</div>
           <span className="font-semibold text-sm tracking-wide">IPMS Assistant</span>
         </div>
-        
-        <button 
+
+        <button
           onClick={() => setMessages([])}
           className="flex items-center gap-3 px-4 py-3 bg-[#282a2c] hover:bg-[#333538] rounded-full text-sm font-medium transition-colors w-full mb-6 shrink-0">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
@@ -127,13 +135,13 @@ export default function ChatInterface() {
         {/* Dynamic Manuals Search & List */}
         <div className="flex-1 flex flex-col overflow-hidden mb-4">
           <p className="text-xs font-semibold text-slate-500 px-3 mb-3">Reference Manuals</p>
-          
+
           {/* Search Bar */}
           <div className="px-2 mb-3 shrink-0">
             <div className="relative">
-              <input 
-                type="text" 
-                placeholder="Search manuals..." 
+              <input
+                type="text"
+                placeholder="Search manuals..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-[#131314] border border-[#333538] rounded-lg pl-8 pr-3 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-slate-500 transition-colors"
@@ -148,13 +156,13 @@ export default function ChatInterface() {
               <p className="text-[11px] text-slate-600 px-2 text-center mt-4">No manuals found.</p>
             ) : (
               filteredManuals.map(manual => (
-                <div 
+                <div
                   key={manual.id}
                   onClick={() => handleOpenManual(manual)}
                   className="px-3 py-2.5 text-xs text-slate-400 hover:bg-[#282a2c] hover:text-slate-200 rounded-lg cursor-pointer truncate transition-colors flex items-center gap-2"
                   title={manual.title || manual.category}
                 >
-                  <span className="shrink-0">📄</span> 
+                  <span className="shrink-0">📄</span>
                   <span className="truncate">{manual.title || manual.category || `Manual #${manual.id}`}</span>
                 </div>
               ))
@@ -170,7 +178,7 @@ export default function ChatInterface() {
 
       {/* Main Chat Area */}
       <main className="flex-1 flex flex-col h-full bg-[#131314] relative">
-        
+
         {/* Top Header */}
         <header className="h-14 px-6 flex items-center justify-between border-b border-transparent">
           <span className="text-sm font-medium text-slate-400">IPMS Industrial Diagnostic Core</span>
@@ -218,7 +226,7 @@ export default function ChatInterface() {
         {/* Floating Gemini-Style Input Box at Bottom */}
         <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[#131314] via-[#131314]/90 to-transparent">
           <div className="max-w-3xl mx-auto bg-[#1e1f20] rounded-3xl border border-[#333538] p-3 shadow-2xl">
-            
+
             {/* Image Preview Thumbnail */}
             {selectedImage && (
               <div className="mb-3 flex items-center gap-3 bg-[#131314] p-2 rounded-2xl w-fit border border-[#333538]">
@@ -231,16 +239,16 @@ export default function ChatInterface() {
             )}
 
             <form onSubmit={handleSend} className="flex items-center gap-2 px-2">
-              <input 
-                type="file" 
-                accept="image/*" 
-                ref={fileInputRef} 
-                onChange={handleImageSelect} 
-                className="hidden" 
+              <input
+                type="file"
+                accept="image/*"
+                ref={fileInputRef}
+                onChange={handleImageSelect}
+                className="hidden"
               />
-              
-              <button 
-                type="button" 
+
+              <button
+                type="button"
                 onClick={() => fileInputRef.current.click()}
                 className="p-2 text-slate-400 hover:text-slate-200 hover:bg-[#282a2c] rounded-full transition-colors"
                 title="Upload image"
@@ -248,7 +256,7 @@ export default function ChatInterface() {
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
               </button>
 
-              <input 
+              <input
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -256,8 +264,8 @@ export default function ChatInterface() {
                 className="flex-1 bg-transparent border-none text-slate-100 placeholder-slate-500 focus:outline-none text-sm px-2 py-2"
               />
 
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 disabled={isLoading || (!input.trim() && !selectedImage)}
                 className="p-2 bg-white hover:bg-slate-200 disabled:opacity-30 text-black rounded-full transition-colors"
               >

@@ -26,10 +26,17 @@ namespace IpmsSmartAssistant.Api.Controllers
         [HttpPost("ask")]
         public async Task<IActionResult> Ask([FromBody] ChatRequest request)
         {
-            // Safely extract the prompt and image from the incoming JSON request
+            /// Safely extract the prompt and image from the incoming JSON request
             string userPrompt = request?.Prompt ?? string.Empty;
             string? imageBase64 = request?.ImageBase64;
             var stopwatch = Stopwatch.StartNew();
+
+
+            // COMBINE PREVIOUS CONTEXT FOR ACCURATE SEARCHING
+            string previousUserMsg = request.History?.LastOrDefault(h => h.Role == "user")?.Content ?? "";
+            string contextualQuery = string.IsNullOrWhiteSpace(previousUserMsg)
+                ? userPrompt
+                : $"{previousUserMsg}. {userPrompt}";
 
             // Ask AI to translate the Malay prompt into English keywords for better matching
             string translationPrompt = $@"Extract the main problem from the query in exactly 2 to 4 words. 
@@ -41,7 +48,7 @@ Query: 'macam mana nak baiki tali sawat' -> Conveyor Belt Alignment
 Query: 'saya x bole nak login website' -> Login Error
 Query: 'pressure gauge is at 0' -> Boiler Pressure Fault
 
-Query: '{userPrompt}' ->";
+Query: '{contextualQuery}' ->"; // <--- THIS NOW USES THE COMBINED CONTEXT
 
             string englishKeywords = await _ollamaService.GenerateTroubleshootingGuideAsync(translationPrompt, null);
 
@@ -112,6 +119,20 @@ Query: '{userPrompt}' ->";
             // 2. Split the AI Prompt Logic
             string augmentedPrompt;
 
+            string chatContext = "";
+            if (request.History != null && request.History.Any())
+            {
+                chatContext = "PREVIOUS CONVERSATION HISTORY:\n";
+                // Only take the last 4 messages to prevent overloading the AI's memory limits
+                var recentHistory = request.History.TakeLast(4);
+                foreach (var msg in recentHistory)
+                {
+                    string roleName = msg.Role == "user" ? "OPERATOR" : "AI ASSISTANT";
+                    chatContext += $"{roleName}: {msg.Content}\n";
+                }
+                chatContext += "\n";
+            }
+
             if (!string.IsNullOrEmpty(imageBase64))
             {
                 // PATH C: Multi-modal Vision + RAG Guidance
@@ -128,6 +149,7 @@ INSTRUCTIONS:
 3. Clearly state whether the gauge/equipment appears normal or abnormal, and provide the exact step-by-step resolution.
 4. STRICT LANGUAGE ENFORCEMENT: Reply in the exact same language as the USER QUERY.
 
+{chatContext}
 USER QUERY: {userPrompt}";
             }
             else if (matchedManual != null)
@@ -143,6 +165,7 @@ CRITICAL INSTRUCTIONS:
 2. You MUST detect the language of the USER QUESTION below. 
 3. TRANSLATE your entire response into that exact same language. If the user asks in Bahasa Melayu, you MUST reply 100% in Bahasa Melayu.
 
+{chatContext}
 USER QUESTION: {userPrompt}";
             }
             else
@@ -153,6 +176,7 @@ USER QUESTION: {userPrompt}";
 CRITICAL RULE: If the question is about a recipe, poem, general coding, or casual chat, you MUST reply EXACTLY with: 'Error: Query out of scope.' (Translate this error to the user's language). 
 Otherwise, answer the industrial query based on general safety. ALWAYS reply in the exact same language as the USER QUESTION.
 
+{chatContext}
 USER QUESTION: {userPrompt}";
             }
 
@@ -256,5 +280,14 @@ USER QUESTION: {userPrompt}";
     {
         public string Prompt { get; set; } = string.Empty;
         public string? ImageBase64 { get; set; }
+        // NEW: Accept chat history from React
+        public List<MessageHistory> History { get; set; } = new();
+    }
+
+    // NEW: Define the structure of a previous chat bubble
+    public class MessageHistory
+    {
+        public string Role { get; set; } = string.Empty; // "user" or "ai"
+        public string Content { get; set; } = string.Empty;
     }
 }
