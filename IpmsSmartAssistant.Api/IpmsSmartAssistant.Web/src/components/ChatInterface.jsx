@@ -25,40 +25,11 @@ export default function ChatInterface() {
     (m.title || m.category || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // 3. Open manual in a new tab dynamically
-  // 3. Open manual in a new tab dynamically
+  // 3. Open manual in a new tab dynamically using the universal backend reader
   const handleOpenManual = (manual) => {
-    // Check if it's a PDF upload or manual typing
-    const isPdfSource = manual.content && manual.content.length > 300;
-
-    if (isPdfSource) {
-      // Open the REAL PDF file served by our C# backend!
-      const pdfUrl = `http://localhost:5268/manuals/${encodeURIComponent(manual.title)}.pdf`;
-      window.open(pdfUrl, '_blank');
-    } else {
-      // Fallback: If it's a manually typed note, show the clean HTML text viewer
-      const newWindow = window.open('', '_blank');
-      newWindow.document.write(`
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>${manual.title || 'IPMS Manual'}</title>
-          <style>
-            body { font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; padding: 3rem; max-width: 800px; margin: 0 auto; background: #0f172a; color: #e2e8f0; }
-            h1 { color: #38bdf8; border-bottom: 1px solid #334155; padding-bottom: 1rem; margin-bottom: 2rem;}
-            pre { white-space: pre-wrap; font-family: inherit; background: #1e293b; padding: 2rem; border-radius: 12px; border: 1px solid #334155; font-size: 15px;}
-          </style>
-        </head>
-        <body>
-          <h1>${manual.title || manual.category || 'Reference Manual'}</h1>
-          <pre>${manual.content}</pre>
-        </body>
-        </html>
-      `);
-      newWindow.document.close();
-    }
+    const manualIdentifier = manual.title || manual.id;
+    const viewUrl = `http://localhost:5268/api/knowledgebase/view/${encodeURIComponent(manualIdentifier)}`;
+    window.open(viewUrl, '_blank');
   };
 
   const handleImageSelect = (e) => {

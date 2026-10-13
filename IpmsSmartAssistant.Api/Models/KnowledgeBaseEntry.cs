@@ -6,5 +6,8 @@ namespace IpmsSmartAssistant.Api.Models
         public string Title { get; set; } = string.Empty;
         public string Keywords { get; set; } = string.Empty;
         public string Content { get; set; } = string.Empty;
+
+        public string? LastModifiedBy { get; set; }
+        public DateTime? LastModifiedAt { get; set; }
     }
 }

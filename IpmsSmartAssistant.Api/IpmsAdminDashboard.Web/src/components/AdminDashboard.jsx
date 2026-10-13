@@ -14,6 +14,14 @@ export default function AdminDashboard() {
   const [pdfKeywords, setPdfKeywords] = useState('');
   const [timeFilter, setTimeFilter] = useState('all');
   const [selectedViewManual, setSelectedViewManual] = useState(null);
+  const [manualSearch, setManualSearch] = useState('');
+  const [manualTypeFilter, setManualTypeFilter] = useState('all'); // 'all' | 'manual' | 'pdf'
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // State for the edit modal/drawer
+  const [editingManual, setEditingManual] = useState(null);
+  const [editForm, setEditForm] = useState({ title: '', keywords: '', content: '' });
+  const [isSaving, setIsSaving] = useState(false);
 
   // Fetch manuals when switching to the Knowledge tab
   const fetchKnowledgeBase = async () => {
@@ -99,27 +107,29 @@ export default function AdminDashboard() {
     }
   };
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        const logsRes = await fetch('http://localhost:5268/api/chat/logs');
-        if (logsRes.ok) setLogs(await logsRes.json());
+  const fetchDashboardData = async (isManual = false) => {
+    if (isManual) setIsRefreshing(true);
+    try {
+      const logsRes = await fetch('http://localhost:5268/api/chat/logs');
+      if (logsRes.ok) setLogs(await logsRes.json());
 
-        const statsRes = await fetch('http://localhost:5268/api/chat/stats');
-        if (statsRes.ok) setStats(await statsRes.json());
+      const statsRes = await fetch('http://localhost:5268/api/chat/stats');
+      if (statsRes.ok) setStats(await statsRes.json());
 
-        // NEW: Fetch the AI-generated summary
-        const summaryRes = await fetch('http://localhost:5268/api/chat/summary');
-        if (summaryRes.ok) {
-          const summaryData = await summaryRes.json();
-          setAiSummary(summaryData.summary);
-        }
-      } catch (error) {
-        console.error("Failed to fetch dashboard data:", error);
-      } finally {
-        setIsLoading(false);
+      const summaryRes = await fetch('http://localhost:5268/api/chat/summary');
+      if (summaryRes.ok) {
+        const summaryData = await summaryRes.json();
+        setAiSummary(summaryData.summary);
       }
-    };
+    } catch (error) {
+      console.error("Failed to fetch dashboard data:", error);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
     fetchDashboardData();
   }, []);
 
@@ -170,6 +180,41 @@ export default function AdminDashboard() {
     }, {})
   ).sort((a, b) => b.count - a.count).slice(0, 5);
 
+  // Handler submit changes back to backend
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    if (!editingManual) return;
+
+    setIsSaving(true);
+    try {
+      const res = await fetch(`http://localhost:5268/api/knowledgebase/${editingManual.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: editForm.title,
+          keywords: editForm.keywords,
+          content: editForm.content,
+          modifiedBy: 'Admin' // You can hook this to dynamic admin user later
+        })
+      });
+
+      if (res.ok) {
+        const updatedEntry = await res.json();
+
+        // Update local state so UI refreshes immediately
+        setKnowledgeBase(prev => prev.map(m => m.id === updatedEntry.id ? updatedEntry : m));
+        setEditingManual(null);
+      } else {
+        alert('Failed to update manual entry.');
+      }
+    } catch (err) {
+      console.error('Update error:', err);
+      alert('Connection error while updating manual.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div className="flex h-screen bg-slate-900 text-slate-100 font-sans overflow-hidden">
 
@@ -200,26 +245,51 @@ export default function AdminDashboard() {
 
         {activeTab === 'overview' && (
           <>
-            <header className="mb-8 flex justify-between items-end">
+            <header className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
               <div>
                 <h2 className="text-3xl font-bold text-slate-100">Dashboard Overview</h2>
                 <p className="text-slate-400 mt-1">Real-time equipment telemetry and AI guardrail monitoring.</p>
               </div>
 
-              {/* NEW: Time Range Toggle Buttons */}
-              <div className="flex bg-slate-800 rounded-lg p-1 border border-slate-700 shadow-sm">
-                {['1d', '7d', '30d', 'all'].map(filter => (
-                  <button
-                    key={filter}
-                    onClick={() => setTimeFilter(filter)}
-                    className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${timeFilter === filter
-                      ? 'bg-blue-600 text-white shadow'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-                      }`}
+              <div className="flex items-center gap-3">
+                {/* OVERVIEW REFRESH BUTTON */}
+                <button
+                  onClick={() => fetchDashboardData(true)}
+                  disabled={isRefreshing}
+                  title="Fetch latest telemetry and AI summary"
+                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700/80 active:bg-slate-700 border border-slate-700 rounded-lg text-xs font-medium text-slate-300 hover:text-white flex items-center gap-2 transition-all shadow-sm disabled:opacity-50"
+                >
+                  <svg
+                    className={`w-3.5 h-3.5 text-blue-400 ${isRefreshing ? 'animate-spin' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
                   >
-                    {filter === '1d' ? '24 Hours' : filter === '7d' ? '7 Days' : filter === '30d' ? '30 Days' : 'All Time'}
-                  </button>
-                ))}
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                  <span>{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+                </button>
+
+                {/* Time Range Toggle Buttons */}
+                <div className="flex bg-slate-800 rounded-lg p-1 border border-slate-700 shadow-sm">
+                  {['1d', '7d', '30d', 'all'].map(filter => (
+                    <button
+                      key={filter}
+                      onClick={() => setTimeFilter(filter)}
+                      className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${timeFilter === filter
+                        ? 'bg-blue-600 text-white shadow'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                        }`}
+                    >
+                      {filter === '1d' ? '24 Hours' : filter === '7d' ? '7 Days' : filter === '30d' ? '30 Days' : 'All Time'}
+                    </button>
+                  ))}
+                </div>
               </div>
             </header>
 
@@ -278,35 +348,52 @@ export default function AdminDashboard() {
                 </div>
               </div>
             </div>
-
+            
             {/* Recent Activity Table */}
             <div className="mt-8 p-6 bg-slate-800 rounded-2xl border border-slate-700 shadow-sm">
-              <h3 className="text-lg font-semibold mb-4 text-slate-200">Recent Telemetry Logs</h3>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-slate-200">Recent Telemetry Logs</h3>
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-700/80 text-slate-300 font-medium">
+                  {filteredLogs.length} events
+                </span>
+              </div>
 
               {isLoading ? (
                 <div className="text-slate-400 animate-pulse">Loading database logs...</div>
               ) : (
-                <div className="overflow-x-auto">
+                /* Scrollable container with hidden scrollbar */
+                <div className="max-h-[420px] overflow-y-auto overflow-x-auto no-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] rounded-xl border border-slate-700/60">
                   <table className="w-full text-left text-sm text-slate-300">
-                    <thead className="bg-slate-900/50 border-b border-slate-700">
+                    {/* Sticky Header stays fixed while rows scroll underneath */}
+                    <thead className="bg-slate-900/95 backdrop-blur border-b border-slate-700 sticky top-0 z-10">
                       <tr>
-                        <th className="p-4 font-semibold rounded-tl-lg">Timestamp</th>
+                        <th className="p-4 font-semibold">Timestamp</th>
                         <th className="p-4 font-semibold">Operator Prompt</th>
                         <th className="p-4 font-semibold">Latency</th>
-                        <th className="p-4 font-semibold rounded-tr-lg">Status</th>
+                        <th className="p-4 font-semibold">Status</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-700/50">
+                    <tbody className="divide-y divide-slate-700/50 bg-slate-900/20">
                       {filteredLogs.map((log) => (
                         <tr key={log.id} className="hover:bg-slate-700/30 transition-colors">
-                          <td className="p-4 whitespace-nowrap">{new Date(log.timestamp).toLocaleString()}</td>
-                          <td className="p-4 max-w-md truncate" title={log.prompt}>{log.prompt}</td>
-                          <td className="p-4 font-mono text-emerald-400">{log.latencyMs} ms</td>
+                          <td className="p-4 whitespace-nowrap text-xs text-slate-400">
+                            {new Date(log.timestamp).toLocaleString()}
+                          </td>
+                          <td className="p-4 max-w-md truncate font-medium text-slate-200" title={log.prompt}>
+                            {log.prompt}
+                          </td>
+                          <td className="p-4 font-mono text-emerald-400 text-xs">
+                            {log.latencyMs} ms
+                          </td>
                           <td className="p-4">
                             {!log.response.includes("Error: Query out of scope") ? (
-                              <span className="px-2 py-1 bg-emerald-500/20 text-emerald-300 rounded text-xs border border-emerald-500/30">Resolved</span>
+                              <span className="px-2 py-1 bg-emerald-500/20 text-emerald-300 rounded text-xs border border-emerald-500/30">
+                                Resolved
+                              </span>
                             ) : (
-                              <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs border border-red-500/30">Blocked</span>
+                              <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs border border-red-500/30">
+                                Blocked
+                              </span>
                             )}
                           </td>
                         </tr>
@@ -331,34 +418,42 @@ export default function AdminDashboard() {
               {/* TOP ROW: Upload and Form */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-                {/* 1. PDF UPLOAD CARD */}
+                {/* 1. DOCUMENT UPLOAD CARD */}
                 <div className="p-6 bg-slate-800 rounded-2xl border border-slate-700 shadow-sm flex flex-col h-full">
-                  <h3 className="text-lg font-semibold mb-4 text-slate-200">Upload PDF Manual</h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-slate-200">Upload Reference Document</h3>
+                    <span className="text-[11px] text-slate-400 bg-slate-900 border border-slate-700 px-2 py-0.5 rounded-md">
+                      PDF • DOCX • TXT • MD
+                    </span>
+                  </div>
 
                   <div className="flex-1 flex flex-col gap-4">
                     {/* Dedicated Dashed Dropzone */}
                     <div className="relative flex-1 flex flex-col items-center justify-center border-dashed border-2 border-slate-600 hover:border-blue-500 bg-slate-900/50 rounded-xl transition-colors min-h-[160px]">
                       <input
                         type="file"
-                        accept="application/pdf"
+                        accept=".pdf,.docx,.txt,.md"
                         onChange={handleFileSelect}
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                         disabled={isUploading}
                       />
 
                       {isUploading ? (
-                        <div className="text-blue-400 animate-pulse font-medium">Processing PDF...</div>
+                        <div className="text-blue-400 animate-pulse font-medium">Extracting document text...</div>
                       ) : selectedFile ? (
                         <div className="z-20 text-center pointer-events-none">
-                          <div className="p-3 bg-slate-800 rounded-xl border border-slate-500 text-sm text-slate-200 shadow-lg">
-                            📄 <span className="font-medium text-blue-400">{selectedFile.name}</span>
+                          <div className="p-3 bg-slate-800 rounded-xl border border-slate-500 text-sm text-slate-200 shadow-lg flex items-center gap-2">
+                            <span className="text-lg">📄</span>
+                            <span className="font-medium text-blue-400">{selectedFile.name}</span>
                           </div>
                         </div>
                       ) : (
                         <div className="pointer-events-none flex flex-col items-center p-4">
-                          <svg className="w-10 h-10 text-slate-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
-                          <h3 className="text-sm font-semibold text-slate-200">Select PDF File</h3>
-                          <p className="text-xs text-slate-500 mt-1 text-center">Click or drag a .pdf file here</p>
+                          <svg className="w-10 h-10 text-slate-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                          </svg>
+                          <h3 className="text-sm font-semibold text-slate-200">Select Document File</h3>
+                          <p className="text-xs text-slate-500 mt-1 text-center">Click or drag PDF, Word (.docx), TXT, or MD here</p>
                         </div>
                       )}
                     </div>
@@ -426,42 +521,197 @@ export default function AdminDashboard() {
 
               </div>
 
-              {/* BOTTOM ROW: Clean Truncated Active Manuals List with Badges */}
-              <div className="p-6 bg-slate-800 rounded-2xl border border-slate-700 shadow-sm w-full">
-                <h3 className="text-lg font-semibold mb-4 text-slate-200">Active Manuals Knowledge Base</h3>
-                <div className="space-y-4 max-h-[450px] overflow-y-auto no-scrollbar">
-                  {knowledgeBase.length === 0 ? (
-                    <p className="text-slate-500">No manuals found in the database.</p>
-                  ) : (
-                    knowledgeBase.map((entry) => {
-                      const isPdfSource = entry.content && entry.content.length > 300;
-                      return (
-                        <div
-                          key={entry.id}
-                          onClick={() => setSelectedViewManual(entry)} // <-- Opens the modal
-                          className="p-4 bg-slate-900 hover:bg-slate-800/80 rounded-xl border border-slate-700 flex justify-between items-center gap-4 cursor-pointer transition-colors"
+              {/* BOTTOM ROW: Active Manuals Knowledge Base */}
+              <div className="p-6 bg-slate-800/90 backdrop-blur rounded-2xl border border-slate-700/80 shadow-lg w-full">
+
+                {/* Header with Search and Filter Pills */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 pb-4 border-b border-slate-700/60">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-semibold text-slate-100 tracking-tight">Active Manuals Knowledge Base</h3>
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">
+                        {knowledgeBase.length}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">Verified references indexed by the local RAG retriever.</p>
+                  </div>
+
+                  {/* Search & Type Filters */}
+                  <div className="flex items-center gap-3">
+                    {/* Search Bar */}
+                    <div className="relative">
+                      <svg className="w-4 h-4 text-slate-500 absolute left-3 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      <input
+                        type="text"
+                        placeholder="Filter manuals..."
+                        value={manualSearch}
+                        onChange={(e) => setManualSearch(e.target.value)}
+                        className="pl-9 pr-3 py-1.5 bg-slate-900 border border-slate-700/80 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 w-44 sm:w-56 transition-colors"
+                      />
+                    </div>
+
+                    {/* Filter Tabs */}
+                    <div className="flex bg-slate-900/80 p-0.5 rounded-xl border border-slate-700/80">
+                      {[
+                        { id: 'all', label: 'All' },
+                        { id: 'manual', label: 'Typed' },
+                        { id: 'pdf', label: 'Files' }
+                      ].map(tab => (
+                        <button
+                          key={tab.id}
+                          onClick={() => setManualTypeFilter(tab.id)}
+                          className={`px-3 py-1 text-xs font-medium rounded-lg transition-all ${manualTypeFilter === tab.id
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'text-slate-400 hover:text-slate-200'
+                            }`}
                         >
-                          <div className="flex items-center gap-3 overflow-hidden">
-                            <div className="truncate">
-                              <div className="flex items-center gap-2">
-                                <h4 className="font-semibold text-slate-200 truncate">{entry.title || entry.category || `Manual #${entry.id}`}</h4>
-                                <span className={`px-2 py-0.5 text-[10px] rounded-full border ${isPdfSource ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}>
-                                  {isPdfSource ? 'PDF Upload' : 'Manual Typing'}
+                          {tab.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Filtered Manual Cards List */}
+                <div className="space-y-3 max-h-[460px] overflow-y-auto no-scrollbar">
+                  {knowledgeBase
+                    .filter((entry) => {
+                      const isPdf = entry.content && entry.content.length > 300;
+                      const matchesType =
+                        manualTypeFilter === 'all' ||
+                        (manualTypeFilter === 'pdf' && isPdf) ||
+                        (manualTypeFilter === 'manual' && !isPdf);
+                      const matchesQuery =
+                        (entry.title || entry.category || '').toLowerCase().includes(manualSearch.toLowerCase()) ||
+                        (entry.content || '').toLowerCase().includes(manualSearch.toLowerCase());
+                      return matchesType && matchesQuery;
+                    })
+                    .length === 0 ? (
+                    <div className="text-center py-10 text-slate-500 text-xs">
+                      No matching manuals found in the knowledge base.
+                    </div>
+                  ) : (
+                    knowledgeBase
+                      .filter((entry) => {
+                        const isPdf = entry.content && entry.content.length > 300;
+                        const matchesType =
+                          manualTypeFilter === 'all' ||
+                          (manualTypeFilter === 'pdf' && isPdf) ||
+                          (manualTypeFilter === 'manual' && !isPdf);
+                        const matchesQuery =
+                          (entry.title || entry.category || '').toLowerCase().includes(manualSearch.toLowerCase()) ||
+                          (entry.content || '').toLowerCase().includes(manualSearch.toLowerCase());
+                        return matchesType && matchesQuery;
+                      })
+                      .map((entry) => {
+                        const isPdfSource = entry.content && entry.content.length > 300;
+
+                        // Format date nicely: "Oct 12, 2026 • 8:17 PM"
+                        const formattedDate = entry.lastModifiedAt
+                          ? new Date(entry.lastModifiedAt).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          }) + ' • ' + new Date(entry.lastModifiedAt).toLocaleTimeString('en-US', {
+                            hour: 'numeric',
+                            minute: '2-digit'
+                          })
+                          : null;
+
+                        return (
+                          <div
+                            key={entry.id}
+                            onClick={() => setSelectedViewManual(entry)}
+                            className="group p-4 bg-slate-900/70 hover:bg-slate-900 rounded-xl border border-slate-700/60 hover:border-slate-600/80 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer transition-all duration-150 shadow-sm"
+                          >
+                            {/* Left Column: Title, Badges, Preview & Audit Log */}
+                            <div className="flex-1 overflow-hidden min-w-0">
+                              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                                <h4 className="font-semibold text-slate-100 text-sm truncate group-hover:text-blue-400 transition-colors">
+                                  {entry.title || entry.category || `Manual #${entry.id}`}
+                                </h4>
+
+                                {/* Source Tag with SVG Icon */}
+                                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-medium rounded-md border ${isPdfSource
+                                  ? 'bg-purple-950/40 text-purple-300 border-purple-800/40'
+                                  : 'bg-blue-950/40 text-blue-300 border-blue-800/40'
+                                  }`}>
+                                  {isPdfSource ? (
+                                    <>
+                                      <svg className="w-3 h-3 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                      </svg>
+                                      Document File
+                                    </>
+                                  ) : (
+                                    <>
+                                      <svg className="w-3 h-3 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                      </svg>
+                                      Manual Note
+                                    </>
+                                  )}
                                 </span>
                               </div>
-                              <p className="text-xs text-slate-400 mt-1 truncate max-w-2xl">
+
+                              {/* Preview Snippet */}
+                              <p className="text-xs text-slate-400 line-clamp-1 max-w-3xl leading-relaxed">
                                 {entry.content}
                               </p>
+
+                              {/* Professional Audit Badge */}
+                              {entry.lastModifiedAt && (
+                                <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-950/60 border border-slate-800 text-[11px] text-slate-400">
+                                  <svg className="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  <span>
+                                    Edited by <strong className="text-slate-300 font-medium">{entry.lastModifiedBy || 'Admin'}</strong> • {formattedDate}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Right Column: Actions */}
+                            <div className="flex items-center gap-2 self-end md:self-center shrink-0">
+                              {!isPdfSource && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingManual(entry);
+                                    setEditForm({
+                                      title: entry.title || entry.category || '',
+                                      keywords: entry.keywords || '',
+                                      content: entry.content || ''
+                                    });
+                                  }}
+                                  className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300 border border-blue-500/20 rounded-lg text-xs font-medium transition-all"
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                  </svg>
+                                  Edit
+                                </button>
+                              )}
+
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteManual(entry.id);
+                                }}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 border border-red-500/20 rounded-lg text-xs font-medium transition-all"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                Delete
+                              </button>
                             </div>
                           </div>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleDeleteManual(entry.id); }} // <-- Prevents modal from opening when deleting
-                            className="px-3 py-1.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 rounded-xl transition-colors text-sm shrink-0">
-                            Delete
-                          </button>
-                        </div>
-                      );
-                    })
+                        );
+                      })
                   )}
                 </div>
               </div>
@@ -471,50 +721,161 @@ export default function AdminDashboard() {
         )}
       </main>
       {/* VIEW MANUAL OVERLAY MODAL */}
-        {selectedViewManual && (
+      {selectedViewManual && (() => {
+        // Only use the iframe for genuine PDFs
+        const ext = (selectedViewManual.fileExtension || selectedViewManual.FileExtension || '').toLowerCase();
+        const isPdf = ext === '.pdf';
+
+        return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-fade-in">
-            <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col">
-              
+            <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+
               {/* Modal Header */}
-              <div className="p-6 border-b border-slate-700 flex justify-between items-center bg-slate-900/50 rounded-t-2xl">
-                <h3 className="text-xl font-bold text-slate-100">{selectedViewManual.title || selectedViewManual.category}</h3>
-                <button onClick={() => setSelectedViewManual(null)} className="text-slate-400 hover:text-white transition-colors">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+              <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-950/70">
+                <div className="flex items-center gap-3">
+                  <h3 className="text-base font-bold text-slate-100">
+                    {selectedViewManual.title || selectedViewManual.category || `Manual #${selectedViewManual.id}`}
+                  </h3>
+                  <span className="text-[10px] px-2 py-0.5 rounded-md font-medium bg-slate-800 border border-slate-700 text-slate-400">
+                    {isPdf ? 'PDF Interactive Viewer' : 'Extracted Document Reader'}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setSelectedViewManual(null)}
+                  className="text-slate-400 hover:text-white transition-colors text-lg"
+                >
+                  ✕
                 </button>
               </div>
-              
-              {/* Modal Body (Extracted AI Text) */}
-              <div className="p-6 overflow-y-auto whitespace-pre-wrap text-slate-300 text-sm leading-relaxed font-mono bg-slate-900/30">
-                {selectedViewManual.content}
+
+              {/* Modal Body */}
+              <div className="flex-1 overflow-hidden relative bg-slate-950 flex flex-col">
+                {isPdf ? (
+                  /* 1. EMBEDDED PDF VIEWER (Only for PDFs) */
+                  <iframe
+                    src={`http://localhost:5268/api/knowledgebase/file/${selectedViewManual.id}#toolbar=0`}
+                    className="w-full h-[68vh] border-none bg-slate-900"
+                    title={selectedViewManual.title}
+                  />
+                ) : (
+                  /* 2. FORMATTED DOCUMENT SHEET (For Word .docx, .txt, .md, and Manual Notes) */
+                  <div className="p-8 overflow-y-auto max-h-[68vh] flex justify-center">
+                    <div className="w-full max-w-2xl bg-slate-900/90 border border-slate-800 rounded-xl p-6 shadow-inner space-y-4 text-slate-200">
+                      <div className="border-b border-slate-800 pb-3">
+                        <span className="text-[11px] font-semibold text-blue-400 uppercase tracking-wider">
+                          {ext === '.docx' ? 'Microsoft Word Reference (.docx)' : 'Equipment Manual Reference'}
+                        </span>
+                        <h2 className="text-xl font-bold text-slate-100 mt-1">
+                          {selectedViewManual.title || selectedViewManual.category}
+                        </h2>
+                      </div>
+                      <div className="whitespace-pre-wrap text-sm leading-relaxed text-slate-300 font-sans">
+                        {selectedViewManual.content}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-              
+
               {/* Modal Footer */}
-              <div className="p-4 border-t border-slate-700 bg-slate-900/50 rounded-b-2xl flex justify-between items-center">
-                {/* Only show the 'View Original PDF' button if it's a PDF upload */}
-                {selectedViewManual.content && selectedViewManual.content.length > 300 ? (
-                  <a 
-                    href={`http://localhost:5268/api/knowledgebase/pdf/${selectedViewManual.title}.pdf`} 
-                    target="_blank" 
+              <div className="px-6 py-3 border-t border-slate-800 bg-slate-950/70 flex justify-between items-center">
+                {ext ? (
+                  <a
+                    href={`http://localhost:5268/api/knowledgebase/view/${selectedViewManual.id}`}
+                    target="_blank"
                     rel="noreferrer"
-                    className="text-blue-400 hover:text-blue-300 text-sm font-medium flex items-center gap-2 transition-colors"
+                    className="text-blue-400 hover:text-blue-300 text-xs font-medium flex items-center gap-1.5 transition-colors"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-                    View Original PDF
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                    {isPdf ? 'Open in New Tab' : 'Download Original File'}
                   </a>
                 ) : (
                   <div></div>
                 )}
-                
-                <button 
-                  onClick={() => setSelectedViewManual(null)} 
-                  className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium transition-colors shadow-sm"
+
+                <button
+                  onClick={() => setSelectedViewManual(null)}
+                  className="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-medium transition-colors"
                 >
-                  Close
+                  Close Viewer
                 </button>
               </div>
+
             </div>
           </div>
-        )}
+        );
+      })()}
+      {editingManual && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-xl flex flex-col p-6 space-y-4">
+
+            <div className="flex justify-between items-center border-b border-slate-700 pb-3">
+              <h3 className="text-lg font-bold text-slate-100">Edit Knowledge Base Entry</h3>
+              <button
+                onClick={() => setEditingManual(null)}
+                className="text-slate-400 hover:text-white transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Equipment / Category Title</label>
+                <input
+                  type="text"
+                  required
+                  value={editForm.title}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, title: e.target.value }))}
+                  className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-sm focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Keywords</label>
+                <input
+                  type="text"
+                  placeholder="e.g. login, conveyor, reset"
+                  value={editForm.keywords}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, keywords: e.target.value }))}
+                  className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-sm focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Issue & Resolution Steps</label>
+                <textarea
+                  rows={5}
+                  required
+                  value={editForm.content}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, content: e.target.value }))}
+                  className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 text-sm focus:outline-none focus:border-blue-500 font-mono"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingManual(null)}
+                  className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl text-xs font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-medium disabled:opacity-50 transition-colors shadow-sm"
+                >
+                  {isSaving ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 }
