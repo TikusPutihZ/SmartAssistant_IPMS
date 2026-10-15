@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell
+} from 'recharts';
 import { useReactToPrint } from 'react-to-print';
 
 export default function AdminDashboard() {
@@ -17,6 +20,7 @@ export default function AdminDashboard() {
   const [manualSearch, setManualSearch] = useState('');
   const [manualTypeFilter, setManualTypeFilter] = useState('all'); // 'all' | 'manual' | 'pdf'
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [expandedGap, setExpandedGap] = useState(null);
 
   // State for the edit modal/drawer
   const [editingManual, setEditingManual] = useState(null);
@@ -180,6 +184,68 @@ export default function AdminDashboard() {
     }, {})
   ).sort((a, b) => b.count - a.count).slice(0, 5);
 
+  // ==========================================
+  // 4. PIE CHART DATA: RESOLVED VS BLOCKED
+  // ==========================================
+  const dynamicResolved = Math.max(0, dynamicTotalQueries - dynamicBlockedAttempts);
+
+  const resolutionPieData = [
+    { name: 'Resolved', value: dynamicResolved, color: '#10b981' }, // Emerald
+    { name: 'Blocked (Out-of-Scope)', value: dynamicBlockedAttempts, color: '#f87171' } // Rose
+  ];
+
+  const blockedPercentage = dynamicTotalQueries > 0
+    ? ((dynamicBlockedAttempts / dynamicTotalQueries) * 100).toFixed(1)
+    : '0';
+
+  const resolvedPercentage = dynamicTotalQueries > 0
+    ? ((dynamicResolved / dynamicTotalQueries) * 100).toFixed(1)
+    : '0';
+
+  // ==========================================
+  // 5. KNOWLEDGE GAP DETECTOR (BLOCKED QUERIES)
+  // ==========================================
+  // Extract all blocked logs and count recurring prompts
+  const blockedLogs = filteredLogs.filter(log =>
+    log.response && log.response.includes("Error: Query out of scope")
+  );
+
+  const blockedCounts = {};
+  blockedLogs.forEach(log => {
+    const key = (log.prompt || 'Unknown Prompt').trim();
+    blockedCounts[key] = (blockedCounts[key] || 0) + 1;
+  });
+
+  // Generates a 1-sentence diagnostic explanation of what the user asked
+  const getGapSummarySentence = (prompt, logsForGap) => {
+    const count = logsForGap.length;
+    const countDesc = count > 1 ? `across ${count} separate attempts` : 'during this shift';
+    const lower = prompt.toLowerCase();
+
+    if (lower.includes('website') || lower.includes('confusion') || lower.includes('portal') || lower.includes('login')) {
+      return `Operator experienced navigation confusion or portal access friction ${countDesc}, but no web system workflow manual is currently registered.`;
+    }
+    if (lower.includes('instruction') || lower.includes('lack') || lower.includes('guide')) {
+      return `Operator requested standard operating procedures or step-by-step guidelines ${countDesc} that are missing from the indexed knowledge base.`;
+    }
+    if (lower.includes('problem') || lower.includes('no main') || lower.includes('fault') || lower.includes('error')) {
+      return `Operator reported an unspecified equipment symptom ${countDesc}, which was blocked by guardrails due to absent diagnostic specifications.`;
+    }
+    return `Operator inquired about "${prompt}" ${countDesc}, which was blocked as out-of-scope because no corresponding equipment manual exists.`;
+  };
+
+  const topBlockedGaps = Object.entries(blockedCounts)
+    .map(([prompt, count]) => ({ prompt, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 6);
+
+  // Quick action: pre-fills the "Add Manual" form and switches tabs
+  const handleDraftManualFromGap = (promptText) => {
+    setNewTitle(promptText);
+    setNewContent(`Equipment / Topic: ${promptText}\n\nSymptoms:\n- \n\nResolution Steps:\n1. \n2. `);
+    setActiveTab('knowledge');
+  };
+
   // Handler submit changes back to backend
   const handleSaveEdit = async (e) => {
     e.preventDefault();
@@ -331,6 +397,8 @@ export default function AdminDashboard() {
                   </ResponsiveContainer>
                 </div>
               </div>
+
+              {/* AI Summary Card */}
               <div className="p-6 bg-slate-800 rounded-2xl border border-slate-700 shadow-sm flex flex-col no-scrollbar">
                 <h3 className="text-lg font-semibold mb-4 text-slate-200">AI Shift Summary</h3>
                 <div className="flex-1 overflow-y-auto text-slate-300 text-sm leading-relaxed bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
@@ -348,7 +416,198 @@ export default function AdminDashboard() {
                 </div>
               </div>
             </div>
-            
+
+            {/* NEW: Guardrail Breakdown & Knowledge Gap Detector */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+
+              {/* 1. PIE / DONUT CHART: RESOLUTION RATIO */}
+              <div className="p-6 bg-slate-800 rounded-2xl border border-slate-700 shadow-sm flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-base font-semibold text-slate-100">Guardrail Enforcement Ratio</h3>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-700 text-slate-300 font-medium">
+                      Live Telemetry
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mb-4">
+                    Resolved vs. Blocked query safety distribution.
+                  </p>
+                </div>
+
+                {/* Donut Chart with Centered Metric */}
+                <div className="relative w-full h-[180px] flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '0.75rem', fontSize: '12px' }}
+                        itemStyle={{ color: '#f8fafc' }}
+                      />
+                      <Pie
+                        data={resolutionPieData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={55}
+                        outerRadius={75}
+                        paddingAngle={4}
+                      >
+                        {resolutionPieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} stroke="#1e293b" strokeWidth={2} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+
+                  {/* Centered Percentage Label */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-2xl font-bold text-red-400">{blockedPercentage}%</span>
+                    <span className="text-[10px] uppercase tracking-wider text-slate-400 font-medium">Blocked</span>
+                  </div>
+                </div>
+
+                {/* Legend Pill Breakdown */}
+                <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-700/60">
+                  <div className="bg-slate-900/60 p-2.5 rounded-xl border border-slate-700/40 text-center">
+                    <div className="flex items-center justify-center gap-1.5 text-xs text-emerald-400 font-semibold mb-0.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                      <span>{resolvedPercentage}%</span>
+                    </div>
+                    <span className="text-[11px] text-slate-400">Resolved ({dynamicResolved})</span>
+                  </div>
+
+                  <div className="bg-slate-900/60 p-2.5 rounded-xl border border-slate-700/40 text-center">
+                    <div className="flex items-center justify-center gap-1.5 text-xs text-red-400 font-semibold mb-0.5">
+                      <span className="w-2 h-2 rounded-full bg-red-400"></span>
+                      <span>{blockedPercentage}%</span>
+                    </div>
+                    <span className="text-[11px] text-slate-400">Blocked ({dynamicBlockedAttempts})</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. BLOCKED QUERIES & KNOWLEDGE GAP DETECTOR */}
+              <div className="lg:col-span-2 p-6 bg-slate-800 rounded-2xl border border-slate-700 shadow-sm flex flex-col">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-semibold text-slate-100">Knowledge Gap Detector</h3>
+                    <span className="px-2 py-0.5 text-[10px] rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 font-medium">
+                      Missing References
+                    </span>
+                  </div>
+                  <span className="text-xs text-slate-400">{blockedLogs.length} total blocks</span>
+                </div>
+                <p className="text-xs text-slate-400 mb-4">
+                  Frequent operator prompts blocked by guardrails. Click <strong>Draft Manual</strong> to register missing equipment documentation directly into the knowledge base.
+                </p>
+
+                {/* List of Blocked Prompts with Dropdown Sentence Summary */}
+                <div className="flex-1 space-y-2.5 overflow-y-auto max-h-[320px] no-scrollbar pr-1">
+                  {topBlockedGaps.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center py-10 text-slate-500 text-xs">
+                      <svg className="w-8 h-8 text-emerald-500/50 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      No blocked attempts recorded in this time range. Knowledge coverage is optimal!
+                    </div>
+                  ) : (
+                    topBlockedGaps.map((item, idx) => {
+                      const isExpanded = expandedGap === item.prompt;
+                      // Get all log occurrences matching this specific blocked query
+                      const matchingLogs = blockedLogs.filter(
+                        log => (log.prompt || '').trim() === item.prompt
+                      );
+
+                      return (
+                        <div
+                          key={idx}
+                          className="bg-slate-900/80 border border-slate-700/60 rounded-xl transition-all duration-200 overflow-hidden"
+                        >
+                          {/* Main Card Header (Click to toggle dropdown) */}
+                          <div className="p-3 flex items-center justify-between gap-3">
+                            <div
+                              onClick={() => setExpandedGap(isExpanded ? null : item.prompt)}
+                              className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer select-none group"
+                            >
+                              <span className="w-6 h-6 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-bold flex items-center justify-center shrink-0">
+                                {idx + 1}
+                              </span>
+
+                              <div className="truncate flex-1">
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-medium text-slate-200 group-hover:text-blue-400 transition-colors truncate" title={item.prompt}>
+                                    {item.prompt}
+                                  </p>
+
+                                  {/* Dropdown Chevron Indicator */}
+                                  <svg
+                                    className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 shrink-0 ${isExpanded ? 'rotate-180 text-blue-400' : ''}`}
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                                  </svg>
+                                </div>
+
+                                <span className="text-[11px] text-slate-400">
+                                  Queried {item.count} {item.count === 1 ? 'time' : 'times'} • {isExpanded ? 'Click to collapse' : 'Click to view summary'}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Direct Bridge Button to Add Manual */}
+                            <button
+                              onClick={() => handleDraftManualFromGap(item.prompt)}
+                              title="Create documentation for this prompt"
+                              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/30 rounded-lg text-xs font-medium transition-all shadow-sm"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                              </svg>
+                              Draft Manual
+                            </button>
+                          </div>
+
+                          {/* DROPDOWN DRAWER: Sentence Summary & Context */}
+                          {isExpanded && (
+                            <div className="px-4 pb-3.5 pt-1 border-t border-slate-800/80 bg-slate-950/60 text-xs space-y-2.5 animate-fade-in">
+                              {/* Highlighted 1-Sentence Summary */}
+                              <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-slate-200 leading-relaxed">
+                                <div className="flex items-center gap-1.5 text-blue-400 font-semibold mb-1 text-[11px] uppercase tracking-wider">
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  <span>Operator Intent Summary</span>
+                                </div>
+                                <p className="text-xs text-slate-300">
+                                  {getGapSummarySentence(item.prompt, matchingLogs)}
+                                </p>
+                              </div>
+
+                              {/* Timestamp Breakdown */}
+                              <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+                                <span className="font-medium text-slate-400">Log timestamps:</span>
+                                {matchingLogs.map((l, lIdx) => (
+                                  <span
+                                    key={lIdx}
+                                    className="px-2 py-0.5 rounded bg-slate-800/80 border border-slate-700/60 font-mono text-[10px] text-slate-300"
+                                  >
+                                    {new Date(l.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+            </div>
+
             {/* Recent Activity Table */}
             <div className="mt-8 p-6 bg-slate-800 rounded-2xl border border-slate-700 shadow-sm">
               <div className="flex justify-between items-center mb-4">
