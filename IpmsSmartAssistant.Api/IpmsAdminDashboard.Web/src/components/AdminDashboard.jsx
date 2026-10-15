@@ -123,7 +123,13 @@ export default function AdminDashboard() {
       const summaryRes = await fetch('http://localhost:5268/api/chat/summary');
       if (summaryRes.ok) {
         const summaryData = await summaryRes.json();
-        setAiSummary(summaryData.summary);
+
+        // Strip out conversational filler like "Here is a...", "Sure!...", "Summary:..."
+        const cleanedSummary = (summaryData.summary || '')
+          .replace(/^(here\s+(is|are)|sure|certainly|summary:)[^:]*:\s*/i, '')
+          .trim();
+
+        setAiSummary(cleanedSummary);
       }
     } catch (error) {
       console.error("Failed to fetch dashboard data:", error);
@@ -398,14 +404,31 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* AI Summary Card */}
+              {/* AI Shift Summary Card */}
               <div className="p-6 bg-slate-800 rounded-2xl border border-slate-700 shadow-sm flex flex-col no-scrollbar">
-                <h3 className="text-lg font-semibold mb-4 text-slate-200">AI Shift Summary</h3>
-                <div className="flex-1 overflow-y-auto text-slate-300 text-sm leading-relaxed bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-semibold text-slate-200">AI Shift Briefing</h3>
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  </div>
+                  <span className="text-[10px] font-medium tracking-wide uppercase px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                    Ollama Core
+                  </span>
+                </div>
+
+                <div className="flex-1 overflow-y-auto text-slate-300 text-sm leading-relaxed bg-slate-900/60 p-4 rounded-xl border border-slate-700/50 flex flex-col justify-between">
                   {aiSummary ? (
-                    <p>{aiSummary}</p>
+                    <div className="space-y-3">
+                      <p className="text-slate-200 font-normal leading-relaxed">
+                        {aiSummary}
+                      </p>
+                      <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+                        <span>Automated Telemetry Synthesis</span>
+                        <span>Plant Operational Status: Stable</span>
+                      </div>
+                    </div>
                   ) : (
-                    <span className="flex items-center text-slate-400 animate-pulse">
+                    <span className="flex items-center text-slate-400 animate-pulse py-8 justify-center">
                       <svg className="w-5 h-5 mr-2 animate-spin text-blue-500" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>

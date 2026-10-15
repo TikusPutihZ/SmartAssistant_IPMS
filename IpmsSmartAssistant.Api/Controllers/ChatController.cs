@@ -271,12 +271,30 @@ USER QUESTION: {userPrompt}";
             if (!recentLogs.Any())
                 return Ok(new { summary = "No telemetry logs available to summarize." });
 
-            var analysisPrompt = "You are a factory analytics AI. Read the following recent queries from industrial operators and write a concise, 2-sentence shift summary. Mention any recurring equipment issues:\n\n"
-                                 + string.Join("\n- ", recentLogs);
+            // 1. Strict prompt forbidding conversational preambles
+            var analysisPrompt = $@"You are the Chief Industrial Operations Controller for an automated palm oil milling plant.
+Analyze the following recent operator query logs and write a direct, factual 2-sentence operational shift briefing. Mention recurring equipment issues.
 
-            var summaryResponse = await _ollamaService.GenerateTroubleshootingGuideAsync(analysisPrompt);
+CRITICAL INSTRUCTIONS:
+- Start IMMEDIATELY with the facts (e.g., 'The shift recorded technical issues including...').
+- DO NOT say 'Here is a summary', 'Sure', or provide any conversational intro.
+- DO NOT use markdown headers or bullet points. Output plain text only.
 
-            return Ok(new { summary = summaryResponse });
+Recent Operator Queries:
+- {string.Join("\n- ", recentLogs)}";
+
+            // 2. Query Ollama
+            var rawSummary = await _ollamaService.GenerateTroubleshootingGuideAsync(analysisPrompt);
+
+            // 3. Regex Safety Net: Automatically strip any remaining conversational prefix
+            string sanitizedSummary = System.Text.RegularExpressions.Regex.Replace(
+                rawSummary ?? string.Empty,
+                @"^(here\s+(is|are)|sure|certainly|shift summary:)[^:]*:\s*",
+                "",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase
+            ).Trim();
+
+            return Ok(new { summary = sanitizedSummary });
         }
     }
 
