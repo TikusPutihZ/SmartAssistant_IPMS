@@ -70,6 +70,9 @@ Query: '{contextualQuery}' ->"; // <--- THIS NOW USES THE COMBINED CONTEXT
             KnowledgeBaseEntry matchedManual = null;
             int highestScore = 0;
 
+            // Stop words: common words that should NOT cause a manual match on their own
+            var stopWords = new HashSet<string> { "fault", "error", "issue", "problem", "broke", "broken", "help", "guide", "manual", "status", "check" };
+
             // Clean and split the COMBINED text into searchable words
             var promptWords = combinedSearchTerms
                 .Split(new[] { ' ', '?', '.', ',', '!', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
@@ -111,7 +114,7 @@ Query: '{contextualQuery}' ->"; // <--- THIS NOW USES THE COMBINED CONTEXT
                 }
             }
 
-            if (highestScore < 3)
+            if (highestScore < 10)
             {
                 matchedManual = null;
             }
@@ -122,8 +125,7 @@ Query: '{contextualQuery}' ->"; // <--- THIS NOW USES THE COMBINED CONTEXT
             string chatContext = "";
             if (request.History != null && request.History.Any())
             {
-                chatContext = "PREVIOUS CONVERSATION HISTORY:\n";
-                // Only take the last 4 messages to prevent overloading the AI's memory limits
+                chatContext = "CONVERSATION HISTORY:\n";
                 var recentHistory = request.History.TakeLast(4);
                 foreach (var msg in recentHistory)
                 {
@@ -135,51 +137,60 @@ Query: '{contextualQuery}' ->"; // <--- THIS NOW USES THE COMBINED CONTEXT
 
             if (!string.IsNullOrEmpty(imageBase64))
             {
-                // PATH C: Multi-modal Vision + RAG Guidance
+                // PATH C: Vision
                 string manualContext = matchedManual != null
                     ? $"[REFERENCE MANUAL: {matchedManual.Title}]\n{matchedManual.Content}\n"
                     : "";
 
-                augmentedPrompt = $@"You are an expert IPMS industrial diagnostic technician specializing in visual inspection and equipment safety.
+                augmentedPrompt = $@"You are an expert IPMS industrial diagnostic technician.
 
 {manualContext}
 INSTRUCTIONS:
-1. Examine the attached equipment image closely (check needle positions, gauge values, warning markers, wear, or physical faults).
-2. Answer the operator query directly using your visual findings and the provided reference manual (if present).
-3. Clearly state whether the gauge/equipment appears normal or abnormal, and provide the exact step-by-step resolution.
-4. STRICT LANGUAGE ENFORCEMENT: Reply in the exact same language as the USER QUERY.
+1. Examine the attached equipment image closely.
+2. Answer the query directly using visual findings and the reference manual if relevant.
+3. State whether the equipment is normal or abnormal, with step-by-step resolution.
+4. Reply in the exact same language as the user.
+5. Never output dialogue labels like 'OPERATOR:' or 'AI ASSISTANT:'.
 
-{chatContext}
-USER QUERY: {userPrompt}";
+{chatContext}OPERATOR: {userPrompt}
+AI ASSISTANT:";
             }
             else if (matchedManual != null)
             {
-                // PATH A: Manual found. Force strict translation at the end of the prompt.
-                augmentedPrompt = $@"You are a professional IPMS safety and diagnostic AI assistant.
+                // PATH A: Manual Found
+                augmentedPrompt = $@"You are a helpful, professional IPMS industrial safety and diagnostic assistant.
 
 [OFFICIAL MANUAL: {matchedManual.Title}]
 {matchedManual.Content}
 
 CRITICAL INSTRUCTIONS:
-1. If the user asks a technical or diagnostic question, answer using ONLY the manual provided above. Provide a clear step-by-step list.
-2. If the user is simply saying 'thank you', 'okay', acknowledging an answer, or greeting you, respond naturally and politely as a friendly AI assistant. DO NOT provide a step-by-step list.
-3. STRICT LANGUAGE ENFORCEMENT: You must reply ONLY in the exact same language as the USER QUESTION OR if the user provides a language preference. DO NOT provide bilingual answers.
+1. If the operator asks a technical question covered by the manual above, provide clear step-by-step instructions based ONLY on the manual.
+2. If the user's query is out-of-scope (home plumbing, recipes, casual gossip), politely decline in a natural tone and mention that this is a 'Query out of scope'.
+3. If the user is acknowledging, saying thanks, or making casual remarks, reply in a warm, brief, natural tone (1 to 2 sentences).
+4. Do NOT repeat or echo 'OPERATOR:' or 'AI ASSISTANT:'. Output ONLY your direct answer.
+5. Reply in the exact same language as the user query.
 
-{chatContext}
-USER QUESTION: {userPrompt}";
+{chatContext}OPERATOR: {userPrompt}
+AI ASSISTANT:";
             }
             else
             {
-                // PATH B: No manual found. Apply the strict guardrail.
-                augmentedPrompt = $@"You are a professional IPMS industrial troubleshooting AI assistant.
+                // PATH B: No Manual / Out-of-Scope
+                augmentedPrompt = $@"You are a friendly, professional IPMS safety and diagnostics AI assistant for palm oil processing plants.
 
-CRITICAL RULE: 
-1. If the question is about a recipe, poem, general coding, or completely unrelated topics, you MUST reply EXACTLY with: 'Error: Query out of scope.' (Translate this to the user's language).
-2. If the user is simply greeting you, saying 'thank you', or acknowledging an answer, respond naturally and politely.
-3. ALWAYS reply in the exact same language as the USER QUESTION.
+CRITICAL INSTRUCTIONS:
+1. If the user is reacting to a previous refusal (e.g., 'u really cant help', 'too bad', 'oh okay', 'nevermind'):
+   - Respond in a warm, human, concise way (1 to 2 sentences max). 
+   - Example: 'Afraid not! My systems are strictly tuned for plant machinery and safety. If you need any equipment help later, I\'ll be right here.'
+   - DO NOT recite your full job description or repeat a long disclaimer.
+2. If the user asks a completely new unrelated query (toilet, recipes, homework):
+   - Politely decline in a conversational voice, mention that it is a 'Query out of scope', and suggest the appropriate department.
+3. If the user is greeting or saying thank you, reply warmly and concisely.
+4. Do NOT repeat 'OPERATOR:' or 'AI ASSISTANT:' in your output.
+5. Reply in the exact same language as the user query.
 
-{chatContext}
-USER QUESTION: {userPrompt}";
+{chatContext}OPERATOR: {userPrompt}
+AI ASSISTANT:";
             }
 
             try
@@ -187,6 +198,17 @@ USER QUESTION: {userPrompt}";
                 // 3. Send augmented prompt and image to the local Ollama model
                 string solution = await _ollamaService.GenerateTroubleshootingGuideAsync(augmentedPrompt, imageBase64);
                 stopwatch.Stop();
+
+                // SANITIZATION: Strip out any accidental prefix tags Ollama might echo
+                if (!string.IsNullOrEmpty(solution))
+                {
+                    solution = System.Text.RegularExpressions.Regex.Replace(
+                        solution,
+                        @"^(OPERATOR:.*?AI ASSISTANT:\s*|USER QUESTION:.*?AI ASSISTANT:\s*|AI ASSISTANT:\s*|AI:\s*)",
+                        "",
+                        System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline
+                    ).Trim();
+                }
 
                 // 4. Log the telemetry ONLY if it's the first question in the chat
                 if (request.History == null || request.History.Count == 0)
@@ -200,7 +222,7 @@ USER QUESTION: {userPrompt}";
                         Response = solution,
                         LatencyMs = stopwatch.ElapsedMilliseconds,
                         Timestamp = DateTime.Now,
-                        IsSuccessful = !solution.Contains("Error: Query out of scope") && !solution.Contains("Query out of scope")
+                        IsSuccessful = !solution.Contains("out of scope", StringComparison.OrdinalIgnoreCase)
                     };
                     _context.TelemetryLogs.Add(log);
                     await _context.SaveChangesAsync();

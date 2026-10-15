@@ -165,7 +165,9 @@ export default function AdminDashboard() {
   // 2. DYNAMICALLY CALCULATE STATS
   // ==========================================
   const dynamicTotalQueries = filteredLogs.length;
-  const dynamicBlockedAttempts = filteredLogs.filter(log => log.response.includes("Error: Query out of scope")).length;
+  const dynamicBlockedAttempts = filteredLogs.filter(log =>
+    log.isSuccessful === false || (log.response && log.response.toLowerCase().includes("out of scope"))
+  ).length;
 
   // Find the most frequent issue in the filtered time frame
   const issueCounts = {};
@@ -213,7 +215,7 @@ export default function AdminDashboard() {
   // ==========================================
   // Extract all blocked logs and count recurring prompts
   const blockedLogs = filteredLogs.filter(log =>
-    log.response && log.response.includes("Error: Query out of scope")
+    log.isSuccessful === false || (log.response && log.response.toLowerCase().includes("out of scope"))
   );
 
   const blockedCounts = {};
@@ -287,6 +289,8 @@ export default function AdminDashboard() {
     }
   };
 
+
+  // ========================================== UI RENDERING ==========================================
   return (
     <div className="flex h-screen bg-slate-900 text-slate-100 font-sans overflow-hidden">
 
@@ -668,7 +672,7 @@ export default function AdminDashboard() {
                             {log.latencyMs} ms
                           </td>
                           <td className="p-4">
-                            {!log.response.includes("Error: Query out of scope") ? (
+                            {log.isSuccessful !== false && !log.response?.toLowerCase().includes("out of scope") ? (
                               <span className="px-2 py-1 bg-emerald-500/20 text-emerald-300 rounded text-xs border border-emerald-500/30">
                                 Resolved
                               </span>
