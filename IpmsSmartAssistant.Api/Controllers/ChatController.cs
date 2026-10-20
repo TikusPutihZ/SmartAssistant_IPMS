@@ -135,24 +135,46 @@ Query: '{contextualQuery}' ->"; // <--- THIS NOW USES THE COMBINED CONTEXT
                 chatContext += "\n";
             }
 
+            // Check for universal Malay particles (catches informal chat & slang)
+            bool isMalay = System.Text.RegularExpressions.Regex.IsMatch(
+                userPrompt,
+                @"\b(nak|nk|mcm|macam|mana|tak|x|kat|katmana|bang|ni|tu|je|jek|dah|dh|tukar|kenapa|apa|saya|awak|bole|boleh|kau|aku|dia|kita|kami)\b",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase
+            );
+
+            // Separate directive for Path A (with manual) vs Path B (fallback/general)
+            string languageDirectivePathA = isMalay
+                ? "DIRECTIVE: The operator is speaking Bahasa Melayu. You MUST translate all manual steps and reply 100% in Bahasa Melayu."
+                : "DIRECTIVE: Reply in English.";
+
+            string languageDirectivePathB = isMalay
+                ? "DIRECTIVE: Reply in Bahasa Melayu."
+                : "DIRECTIVE: Reply in English.";
+
             if (!string.IsNullOrEmpty(imageBase64))
             {
-                // PATH C: Vision
-                string manualContext = matchedManual != null
-                    ? $"[REFERENCE MANUAL: {matchedManual.Title}]\n{matchedManual.Content}\n"
-                    : "";
+                // PATH C: Vision-First Spatial Localization & Diagnostics
+                augmentedPrompt = $@"You are a sharp, direct IPMS technical and UI assistant.
 
-                augmentedPrompt = $@"You are an expert IPMS industrial diagnostic technician.
+TASK:
+The operator has uploaded a screenshot or plant image and is asking a question about it.
+Examine the visual elements, text, buttons, and icons in the image carefully.
 
-{manualContext}
-INSTRUCTIONS:
-1. Examine the attached equipment image closely.
-2. Answer the query directly using visual findings and the reference manual if relevant.
-3. State whether the equipment is normal or abnormal, with step-by-step resolution.
-4. Reply in the exact same language as the user.
-5. Never output dialogue labels like 'OPERATOR:' or 'AI ASSISTANT:'.
+SPATIAL GUIDANCE RULES:
+1. Direct Location Pinpointing:
+   - Identify the exact visual location on screen (e.g. 'sudut atas sebelah kanan', 'sidebar sebelah kiri', 'bahagian header').
+   - Mention visual cues like colors, icons, and exact text labels (e.g. 'bulatan warna ungu dengan ikon orang', 'butang Settings dengan ikon gear').
+2. Handling UI Steps:
+   - If the operator asks about 'Step 1' (User Avatar), point out the avatar icon at the top-right. If the menu is already open, tell them what to click next (e.g. Settings on the left sidebar).
+3. Do NOT give excuses like 'lokasi tidak jelas' or recite full manuals. Answer where to click in 2 to 4 concise sentences.
+4. Language: If the operator asks in Malay, answer directly in natural, friendly Bahasa Melayu.
+
+IN-CONTEXT EXAMPLE:
+Operator: 'mana patut saya tekan ea utk step 1 tu'
+AI ASSISTANT: 'Untuk Step 1 (User Avatar), ia adalah ikon bulatan ungu di sudut atas sebelah kanan (bersebelahan ikon loceng). Memandangkan menu profil tersebut sudah terbuka, pilihan untuk akaun atau tetapan sebenarnya terletak pada menu sebelah kiri iaitu ikon gear ""Settings"" di bawah bahagian ""Your account"".'
 
 {chatContext}OPERATOR: {userPrompt}
+{languageDirectivePathB}
 AI ASSISTANT:";
             }
             else if (matchedManual != null)
@@ -163,14 +185,17 @@ AI ASSISTANT:";
 [OFFICIAL MANUAL: {matchedManual.Title}]
 {matchedManual.Content}
 
-CRITICAL INSTRUCTIONS:
-1. If the operator asks a technical question covered by the manual above, provide clear step-by-step instructions based ONLY on the manual.
-2. If the user's query is out-of-scope (home plumbing, recipes, casual gossip), politely decline in a natural tone and mention that this is a 'Query out of scope'.
-3. If the user is acknowledging, saying thanks, or making casual remarks, reply in a warm, brief, natural tone (1 to 2 sentences).
-4. Do NOT repeat or echo 'OPERATOR:' or 'AI ASSISTANT:'. Output ONLY your direct answer.
-5. Reply in the exact same language as the user query.
+IN-CONTEXT EXAMPLES:
+- Operator: 'how do I reset password?' -> AI: '1. Navigate to the main dashboard...'
+- Operator: 'mcm mana nak tukar password bang' -> AI: '1. Pergi ke papan pemuka utama...'
+
+INSTRUCTIONS:
+1. Provide the troubleshooting steps from the manual as a numbered list (1., 2., 3., etc.) with line breaks between steps.
+2. If the query is completely unrelated to plant operations (e.g. cooking, toilet), politely decline as 'Query out of scope'.
+3. Do NOT output dialogue tags like 'OPERATOR:' or 'AI ASSISTANT:'.
 
 {chatContext}OPERATOR: {userPrompt}
+{languageDirectivePathA}
 AI ASSISTANT:";
             }
             else
@@ -179,17 +204,19 @@ AI ASSISTANT:";
                 augmentedPrompt = $@"You are a friendly, professional IPMS safety and diagnostics AI assistant for palm oil processing plants.
 
 CRITICAL INSTRUCTIONS:
-1. If the user is reacting to a previous refusal (e.g., 'u really cant help', 'too bad', 'oh okay', 'nevermind'):
-   - Respond in a warm, human, concise way (1 to 2 sentences max). 
-   - Example: 'Afraid not! My systems are strictly tuned for plant machinery and safety. If you need any equipment help later, I\'ll be right here.'
-   - DO NOT recite your full job description or repeat a long disclaimer.
-2. If the user asks a completely new unrelated query (toilet, recipes, homework):
-   - Politely decline in a conversational voice, mention that it is a 'Query out of scope', and suggest the appropriate department.
-3. If the user is greeting or saying thank you, reply warmly and concisely.
-4. Do NOT repeat 'OPERATOR:' or 'AI ASSISTANT:' in your output.
-5. Reply in the exact same language as the user query.
+1. OUT-OF-SCOPE ENFORCEMENT:
+   - If the operator asks about anything outside palm oil mill machinery and industrial software (e.g., tandas/toilet, tandas tersumbat, sinki, makanan/cooking, cuaca, hal peribadi):
+   - You MUST politely decline and explicitly state the phrase 'Query out of scope' (e.g., 'Query out of scope: Maaf, saya hanya membantu berkenaan mesin dan sistem kilang...').
+   - Do NOT attempt to provide plumbing or general advice.
+
+2. CASUAL CHAT & GREETINGS:
+   - If the user is greeting, saying thanks, or reacting ('terima kasih', 'ok bang', 'takpe'), reply warmly in 1 to 2 sentences.
+
+3. CLEAN OUTPUT:
+   - Do NOT repeat 'OPERATOR:' or 'AI ASSISTANT:'.
 
 {chatContext}OPERATOR: {userPrompt}
+{languageDirectivePathB}
 AI ASSISTANT:";
             }
 
@@ -216,13 +243,16 @@ AI ASSISTANT:";
                     string cleanKeywords = englishKeywords.Replace("\n", " ").Trim().ToLower();
                     string mainProblemLabel = System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(cleanKeywords);
 
+                    bool isBlocked = solution.Contains("out of scope", StringComparison.OrdinalIgnoreCase)
+                                  || solution.Contains("luar skop", StringComparison.OrdinalIgnoreCase);
+
                     var log = new TelemetryLog
                     {
                         Prompt = mainProblemLabel,
                         Response = solution,
                         LatencyMs = stopwatch.ElapsedMilliseconds,
                         Timestamp = DateTime.Now,
-                        IsSuccessful = !solution.Contains("out of scope", StringComparison.OrdinalIgnoreCase)
+                        IsSuccessful = !isBlocked
                     };
                     _context.TelemetryLogs.Add(log);
                     await _context.SaveChangesAsync();
@@ -318,6 +348,26 @@ Recent Operator Queries:
 
             return Ok(new { summary = sanitizedSummary });
         }
+
+        [HttpPost("generate-report")]
+        public async Task<IActionResult> GenerateReport([FromBody] ReportRequest request)
+        {
+            if (request == null || string.IsNullOrWhiteSpace(request.Prompt))
+            {
+                return BadRequest("Prompt cannot be empty.");
+            }
+
+            try
+            {
+                // Directly generate the report via Ollama without polluting operator telemetry logs
+                string report = await _ollamaService.GenerateTroubleshootingGuideAsync(request.Prompt, null);
+                return Ok(new { report });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
     }
 
     public class ChatRequest
@@ -334,4 +384,10 @@ Recent Operator Queries:
         public string Role { get; set; } = string.Empty; // "user" or "ai"
         public string Content { get; set; } = string.Empty;
     }
+
+    public class ReportRequest
+    {
+        public string Prompt { get; set; }
+    }
+
 }
