@@ -1,39 +1,39 @@
 export default function AdminSidebar({
     activeTab,
     setActiveTab,
-    knowledgeBase,
-    knowledgeAuditHistory,
-    isHistoryOpen,
-    setIsHistoryOpen,
-    onSelectManual,
-    onExportReport
+    knowledgeCount = 0,
+    onLogout,
+    currentUser = { username: 'System Admin', role: 'Terminal Node 5268' }
 }) {
     return (
-        <aside className="w-72 bg-slate-950 border-r border-slate-800/80 p-5 flex flex-col justify-between shrink-0 select-none">
-            <div>
+        <aside className="w-64 bg-blue-700 text-white flex flex-col justify-between p-5 border-r border-blue-800 shadow-xl select-none shrink-0 z-20">
+
+            {/* Top: Logo & Main Navigation */}
+            <div className="space-y-8">
+
                 {/* Brand Header */}
-                <div className="flex items-center gap-3 mb-6 px-1">
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20 shrink-0">
-                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                        </svg>
+                <div className="flex items-center gap-3 px-1">
+                    <div className="w-10 h-10 rounded-xl bg-white/15 border border-white/20 p-1.5 flex items-center justify-center shadow-sm backdrop-blur-sm">
+                        <img src="/ipms-logo.png" alt="IPMS Logo" className="w-full h-full object-contain brightness-0 invert" />
                     </div>
                     <div>
-                        <div className="flex items-center gap-2">
-                            <h1 className="font-bold text-sm text-slate-100 tracking-tight">IPMS Console</h1>
-                        </div>
-                        <p className="text-[10px] font-medium text-slate-400">Industrial Operations Core</p>
+                        <h1 className="text-sm font-bold tracking-tight text-white flex items-center gap-1.5">
+                            <span>IPMS Console</span>
+                        </h1>
+                        <p className="text-[10px] text-blue-100 font-medium tracking-wide">
+                            Industrial Operations Core
+                        </p>
                     </div>
                 </div>
 
-                {/* Navigation Links */}
+                {/* Navigation Tabs */}
                 <nav className="space-y-1.5">
-                    {/* Overview Tab Button */}
+                    {/* 1. Overview Tab */}
                     <button
                         onClick={() => setActiveTab('overview')}
                         className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === 'overview'
-                                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                                ? 'bg-white text-blue-700 shadow-md shadow-blue-900/20'
+                                : 'text-blue-100 hover:text-white hover:bg-blue-600/70'
                             }`}
                     >
                         <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -42,112 +42,34 @@ export default function AdminSidebar({
                         <span>Overview</span>
                     </button>
 
-                    {/* Manage Knowledge Navigation Item */}
-                    <div>
-                        <div
-                            onClick={() => setActiveTab('knowledge')}
-                            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-all ${activeTab === 'knowledge'
-                                    ? 'bg-blue-600/15 text-blue-400 border border-blue-500/20'
-                                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-                                }`}
-                        >
-                            <div className="flex items-center gap-3">
-                                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                                </svg>
-                                <span>Manage Knowledge</span>
-                            </div>
-
-                            <div className="flex items-center gap-1.5">
-                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700/60">
-                                    {knowledgeBase.length}
-                                </span>
-
-                                {/* Dropdown Chevron */}
-                                <button
-                                    type="button"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setIsHistoryOpen(!isHistoryOpen);
-                                    }}
-                                    title="Toggle revision timeline"
-                                    className="p-1 hover:text-white rounded hover:bg-slate-800 text-slate-400 transition-colors"
-                                >
-                                    <svg
-                                        className={`w-3.5 h-3.5 transition-transform duration-200 ${isHistoryOpen ? 'rotate-180 text-blue-400' : ''}`}
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                                    </svg>
-                                </button>
-                            </div>
+                    {/* 2. Manage Knowledge Tab */}
+                    <button
+                        onClick={() => setActiveTab('knowledge')}
+                        className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === 'knowledge'
+                                ? 'bg-white text-blue-700 shadow-md shadow-blue-900/20'
+                                : 'text-blue-100 hover:text-white hover:bg-blue-600/70'
+                            }`}
+                    >
+                        <div className="flex items-center gap-3">
+                            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                            </svg>
+                            <span>Manage Knowledge</span>
                         </div>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${activeTab === 'knowledge'
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'bg-blue-800/80 text-blue-100'
+                            }`}>
+                            {knowledgeCount}
+                        </span>
+                    </button>
 
-                        {/* Git-Graph Commit Timeline */}
-                        {isHistoryOpen && (
-                            <div className="mt-2.5 ml-5 pl-3.5 border-l-2 border-slate-800 space-y-3.5 max-h-[300px] overflow-y-auto no-scrollbar py-1 animate-fade-in">
-                                {knowledgeAuditHistory.length === 0 ? (
-                                    <p className="text-[11px] text-slate-500 italic">No revisions logged.</p>
-                                ) : (
-                                    knowledgeAuditHistory.map((entry, idx) => {
-                                        const isEdited = Boolean(entry.lastModifiedAt);
-                                        const formattedDate = entry.lastModifiedAt
-                                            ? new Date(entry.lastModifiedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                                            : 'Initial';
-
-                                        return (
-                                            <div
-                                                key={entry.id || idx}
-                                                onClick={() => {
-                                                    setActiveTab('knowledge');
-                                                    onSelectManual(entry);
-                                                }}
-                                                className="relative group cursor-pointer -ml-[21px] pl-5 pr-1 py-1 rounded-lg hover:bg-slate-900/60 transition-colors"
-                                            >
-                                                {/* Git Commit Node */}
-                                                <span
-                                                    className={`absolute left-[5px] top-2.5 w-2 h-2 rounded-full ring-4 ring-slate-950 transition-all group-hover:scale-125 ${isEdited
-                                                            ? 'bg-blue-400 shadow-sm shadow-blue-400/50'
-                                                            : 'bg-emerald-400 shadow-sm shadow-emerald-400/50'
-                                                        }`}
-                                                />
-
-                                                {/* Commit Text */}
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <span
-                                                        className="text-[11px] font-medium text-slate-300 group-hover:text-blue-400 truncate transition-colors"
-                                                        title={entry.title || entry.category}
-                                                    >
-                                                        {entry.title || entry.category}
-                                                    </span>
-                                                    <span
-                                                        className={`text-[8px] font-bold uppercase tracking-wider px-1 py-0.5 rounded shrink-0 ${isEdited ? 'text-blue-400 bg-blue-500/10' : 'text-emerald-400 bg-emerald-500/10'
-                                                            }`}
-                                                    >
-                                                        {isEdited ? 'edit' : 'add'}
-                                                    </span>
-                                                </div>
-
-                                                <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono mt-0.5">
-                                                    <span>{entry.lastModifiedBy || 'Admin'}</span>
-                                                    <span>{formattedDate}</span>
-                                                </div>
-                                            </div>
-                                        );
-                                    })
-                                )}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Export Report Navigation Button */}
+                    {/* 3. Export Report Tab */}
                     <button
                         onClick={() => setActiveTab('report')}
                         className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === 'report'
-                                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                                ? 'bg-white text-blue-700 shadow-md shadow-blue-900/20'
+                                : 'text-blue-100 hover:text-white hover:bg-blue-600/70'
                             }`}
                     >
                         <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -158,21 +80,34 @@ export default function AdminSidebar({
                 </nav>
             </div>
 
-            {/* Footer Admin Status Badge */}
-            <div className="pt-4 border-t border-slate-800/80">
-                <div className="flex items-center justify-between p-2 rounded-xl bg-slate-900/60 border border-slate-800/60">
+            {/* Bottom: Profile & Logout */}
+            <div className="pt-4 border-t border-blue-600/60 space-y-3">
+                <div className="flex items-center justify-between p-2.5 rounded-2xl bg-blue-800/50 border border-blue-600/40">
                     <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-7 h-7 rounded-lg bg-blue-600/20 border border-blue-500/30 flex items-center justify-center font-bold text-[11px] text-blue-400 shrink-0">
+                        <div className="w-8 h-8 rounded-xl bg-white/15 text-white flex items-center justify-center font-bold text-xs shrink-0">
                             AD
                         </div>
-                        <div className="truncate">
-                            <p className="text-xs font-semibold text-slate-200 truncate">System Admin</p>
-                            <p className="text-[10px] text-slate-400 truncate">Terminal Node 5268</p>
+                        <div className="min-w-0">
+                            <p className="text-xs font-bold text-white truncate">{currentUser.username || 'System Admin'}</p>
+                            <p className="text-[10px] text-blue-200 truncate">{currentUser.role || 'Terminal Node 5268'}</p>
                         </div>
                     </div>
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 shadow-sm shadow-emerald-400/50"></span>
                 </div>
+
+                {onLogout && (
+                    <button
+                        onClick={onLogout}
+                        className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold text-blue-100 hover:text-white hover:bg-blue-800/60 rounded-xl transition-all cursor-pointer"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                        <span>Logout</span>
+                    </button>
+                )}
             </div>
+
         </aside>
     );
 }

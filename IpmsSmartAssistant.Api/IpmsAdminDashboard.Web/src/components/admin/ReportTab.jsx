@@ -118,12 +118,12 @@ FORMATTING RULES:
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5">
-            <h2 className="text-2xl font-bold tracking-tight text-slate-100">AI Report Synthesizer</h2>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20 uppercase tracking-wider">
+            <h2 className="text-2xl font-bold tracking-tight text-slate-900">AI Report Synthesizer</h2>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-600 border border-blue-200 uppercase tracking-wider">
               Audit Engine v2.4
             </span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-500 mt-1">
             Persist custom audit templates. Ollama generates formal compliance reports from live telemetry.
           </p>
         </div>
@@ -132,7 +132,7 @@ FORMATTING RULES:
           <button
             onClick={handleGenerateReport}
             disabled={isGenerating}
-            className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-md shadow-blue-500/20 flex items-center gap-2 transition-all active:scale-[0.98]"
+            className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-md shadow-blue-500/20 flex items-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
           >
             {isGenerating ? (
               <>
@@ -155,9 +155,9 @@ FORMATTING RULES:
           <button
             onClick={handlePrint}
             disabled={!aiReportContent && dynamicTotalQueries === 0}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700/90 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shadow-xs disabled:opacity-40"
+            className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shadow-sm disabled:opacity-40 cursor-pointer"
           >
-            <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
             </svg>
             <span>Print / Save PDF</span>
@@ -166,28 +166,28 @@ FORMATTING RULES:
       </header>
 
       {/* 2. Sleek Template Dock */}
-      <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-4 shadow-sm backdrop-blur">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-blue-600/10 border border-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-xs shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <p className="text-xs font-semibold text-slate-200 truncate">{templateName}</p>
-                <span className="text-[9px] font-semibold px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <p className="text-xs font-semibold text-slate-800 truncate">{templateName}</p>
+                <span className="text-[9px] font-semibold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
                   PERSISTED
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400">Rules applied during automated report synthesis</p>
+              <p className="text-[10px] text-slate-500">Rules applied during automated report synthesis</p>
             </div>
           </div>
 
           <div className="flex items-center gap-1.5 self-end sm:self-auto">
-            <label className="cursor-pointer px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700/80 rounded-lg text-xs font-medium text-slate-300 transition-colors inline-flex items-center gap-1.5 shadow-2xs">
-              <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <label className="cursor-pointer px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 transition-colors inline-flex items-center gap-1.5 shadow-2xs">
+              <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
               </svg>
               <span>Upload Template</span>
@@ -201,14 +201,14 @@ FORMATTING RULES:
 
             <button
               onClick={() => setIsEditingTemplate(!isEditingTemplate)}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700/80 rounded-lg text-xs font-medium text-blue-400 transition-colors shadow-2xs"
+              className="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-blue-600 transition-colors shadow-2xs cursor-pointer"
             >
               {isEditingTemplate ? 'Done' : 'Edit Rules'}
             </button>
 
             <button
               onClick={() => handleSaveTemplate(DEFAULT_TEMPLATE, 'Default IPMS Industrial Audit Template')}
-              className="p-1.5 text-slate-400 hover:text-slate-200 transition-colors"
+              className="p-1.5 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
               title="Reset to default template"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -225,22 +225,22 @@ FORMATTING RULES:
               rows={5}
               value={templateText}
               onChange={(e) => setTemplateText(e.target.value)}
-              className="w-full p-3 bg-slate-950 border border-slate-700/90 rounded-xl text-slate-200 text-xs font-mono leading-relaxed focus:outline-none focus:border-blue-500"
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-mono leading-relaxed focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
               placeholder="Define structural sections and instructions..."
             />
             <div className="flex justify-end">
               <button
                 onClick={() => handleSaveTemplate(templateText, 'Custom Defined Template')}
-                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-medium transition-colors"
+                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-medium transition-colors cursor-pointer shadow-xs"
               >
                 Save Changes
               </button>
             </div>
           </div>
         ) : (
-          <div className="mt-2.5 px-3 py-2 bg-slate-950/60 rounded-xl border border-slate-800/80 flex items-start gap-2">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 mt-0.5">Rules:</span>
-            <p className="text-xs text-slate-400 font-mono line-clamp-2 leading-relaxed">
+          <div className="mt-2.5 px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 flex items-start gap-2">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider shrink-0 mt-0.5">Rules:</span>
+            <p className="text-xs text-slate-600 font-mono line-clamp-2 leading-relaxed">
               {templateText.replace(/\n/g, '  •  ')}
             </p>
           </div>
@@ -248,25 +248,25 @@ FORMATTING RULES:
       </div>
 
       {/* 3. Document Inspection Workbench */}
-      <div className="bg-slate-950/70 border border-slate-800/80 rounded-2xl p-4 sm:p-6 flex flex-col items-center shadow-inner">
+      <div className="bg-slate-100 border border-slate-200 rounded-2xl p-4 sm:p-6 flex flex-col items-center shadow-inner">
         
         {/* Document Inspection Bar */}
-        <div className="w-full max-w-[210mm] mb-3 flex items-center justify-between text-[11px] text-slate-400 px-1 font-mono">
+        <div className="w-full max-w-[210mm] mb-3 flex items-center justify-between text-[11px] text-slate-500 px-1 font-mono">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
             <span>STANDARD A4 PORTRAIT • 210 × 297 MM</span>
           </div>
           <div className="flex items-center gap-3">
             <span>PAGE 1 OF 1</span>
-            <span className="text-slate-400">|</span>
-            <span className="text-slate-300 font-sans font-medium">Verified RAG Output</span>
+            <span className="text-slate-300">|</span>
+            <span className="text-slate-700 font-sans font-medium">Verified RAG Output</span>
           </div>
         </div>
 
         {/* Physical A4 Sheet Container */}
         <div
           ref={printSheetRef}
-          className="w-full max-w-[210mm] bg-white text-slate-900 rounded-sm shadow-2xl p-8 sm:p-12 border border-slate-200 font-sans min-h-[780px] flex flex-col justify-between select-text"
+          className="w-full max-w-[210mm] bg-white text-slate-900 rounded-sm shadow-xl p-8 sm:p-12 border border-slate-300 font-sans min-h-[780px] flex flex-col justify-between select-text"
         >
           <div>
             {/* Header with Fail-safe Logo Branding */}
@@ -305,19 +305,19 @@ FORMATTING RULES:
 
             {/* Shift Key Metrics Tiles */}
             <div className="grid grid-cols-4 gap-2.5 mb-6 text-center">
-              <div className="border border-slate-200 rounded-lg p-2.5 bg-slate-50/80">
+              <div className="border border-slate-200 rounded-lg p-2.5 bg-slate-50">
                 <span className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider">Total Queries</span>
                 <span className="text-lg font-extrabold text-slate-900 leading-tight">{dynamicTotalQueries}</span>
               </div>
-              <div className="border border-slate-200 rounded-lg p-2.5 bg-slate-50/80">
+              <div className="border border-slate-200 rounded-lg p-2.5 bg-slate-50">
                 <span className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider">Resolved</span>
                 <span className="text-lg font-extrabold text-emerald-700 leading-tight">{dynamicResolved}</span>
               </div>
-              <div className="border border-slate-200 rounded-lg p-2.5 bg-slate-50/80">
+              <div className="border border-slate-200 rounded-lg p-2.5 bg-slate-50">
                 <span className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider">Blocked</span>
                 <span className="text-lg font-extrabold text-rose-700 leading-tight">{dynamicBlockedAttempts}</span>
               </div>
-              <div className="border border-slate-200 rounded-lg p-2.5 bg-slate-50/80">
+              <div className="border border-slate-200 rounded-lg p-2.5 bg-slate-50">
                 <span className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider">Primary Fault</span>
                 <span className="text-[11px] font-bold text-slate-800 truncate block mt-0.5" title={dynamicTopIssue}>
                   {dynamicTopIssue}
@@ -339,11 +339,11 @@ FORMATTING RULES:
                 </div>
               ) : (
                 <div className="py-20 text-center space-y-2 border border-dashed border-slate-200 rounded-xl bg-slate-50/50">
-                  <svg className="w-9 h-9 mx-auto text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-9 h-9 mx-auto text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                  <p className="font-semibold text-slate-600 text-xs">No Report Generated Yet</p>
-                  <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
+                  <p className="font-semibold text-slate-700 text-xs">No Report Generated Yet</p>
+                  <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
                     Click <strong>Generate AI Report</strong> on the top right to analyze live telemetry according to the template rules.
                   </p>
                 </div>
