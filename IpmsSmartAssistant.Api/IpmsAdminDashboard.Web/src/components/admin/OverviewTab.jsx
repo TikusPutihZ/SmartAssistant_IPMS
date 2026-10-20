@@ -1,7 +1,9 @@
+import { useState, useMemo } from 'react';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-    PieChart, Pie, Cell
+    PieChart, Pie, Cell, LabelList
 } from 'recharts';
+
 
 export default function OverviewTab({
     fetchDashboardData,
@@ -26,6 +28,65 @@ export default function OverviewTab({
     isLoading,
     filteredLogs
 }) {
+
+    // Telemetry Table Filters
+    const [logSearch, setLogSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'resolved' | 'blocked'
+    const [dateFilter, setDateFilter] = useState(''); // 'YYYY-MM-DD'
+
+    const displayedLogs = useMemo(() => {
+        return (filteredLogs || []).filter(log => {
+            // A. Status Filter
+            const isBlocked = log.isSuccessful === false || (log.response && log.response.toLowerCase().includes("out of scope"));
+            if (statusFilter === 'resolved' && isBlocked) return false;
+            if (statusFilter === 'blocked' && !isBlocked) return false;
+
+            // B. Date Picker Filter (compares YYYY-MM-DD)
+            if (dateFilter) {
+                const logDate = new Date(log.timestamp).toISOString().slice(0, 10);
+                if (logDate !== dateFilter) return false;
+            }
+
+            // C. Text Search (Matches prompt or date text)
+            if (logSearch.trim()) {
+                const query = logSearch.toLowerCase();
+                const matchesPrompt = (log.prompt || '').toLowerCase().includes(query);
+                const matchesDate = new Date(log.timestamp).toLocaleString().toLowerCase().includes(query);
+                if (!matchesPrompt && !matchesDate) return false;
+            }
+
+            return true;
+        });
+    }, [filteredLogs, logSearch, statusFilter, dateFilter]);
+
+    // Top Alert Banner State & Count Calculation
+    const [isAlertAcknowledged, setIsAlertAcknowledged] = useState(false);
+
+    const topIssueInfo = useMemo(() => {
+        if (!filteredLogs || filteredLogs.length === 0) {
+            return { name: dynamicTopIssue || 'No active alerts', count: 0 };
+        }
+        const counts = {};
+        filteredLogs.forEach(l => {
+            const p = (l.prompt || '').trim();
+            if (p) counts[p] = (counts[p] || 0) + 1;
+        });
+        const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+        if (sorted.length > 0) {
+            return { name: sorted[0][0], count: sorted[0][1] };
+        }
+        return { name: dynamicTopIssue || '--', count: 0 };
+    }, [filteredLogs, dynamicTopIssue]);
+
+    const BAR_COLORS = [
+        '#2563eb', // 1. Royal Blue
+        '#0284c7', // 2. Sky Blue
+        '#0d9488', // 3. Teal
+        '#6366f1', // 4. Indigo
+        '#f59e0b', // 5. Amber
+    ];
+
+
     return (
         <>
             <header className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
@@ -76,43 +137,194 @@ export default function OverviewTab({
                 </div>
             </header>
 
+            {/* Top Shift Insight Banner */}
+            {!isAlertAcknowledged && topIssueInfo.count > 0 && (
+                <div className="mb-8 p-6 sm:p-7 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 text-white shadow-xl relative overflow-hidden animate-fade-in border border-indigo-500/20">
+
+                    {/* Ambient light glow */}
+                    <div className="absolute -top-12 -right-12 w-44 h-44 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+
+                    <div className="relative z-10 space-y-3">
+                        {/* 1. Status Beacon */}
+                        <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                            <span className="text-[11px] font-semibold text-cyan-300 tracking-wide uppercase">
+                                Shift Telemetry Insight
+                            </span>
+                        </div>
+
+                        {/* 2. Headline */}
+                        <h3 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white flex items-center gap-2.5 flex-wrap">
+                            <span>{topIssueInfo.count} Inquiries</span>
+                            <span className="text-indigo-300 font-light">•</span>
+                            <span className="text-blue-100">{topIssueInfo.name}</span>
+                        </h3>
+
+                        {/* 3. Subtext & Action Buttons (Aligned on the Same Line) */}
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-1">
+                            <p className="text-xs sm:text-sm text-slate-300 font-normal leading-relaxed max-w-2xl">
+                                Most frequent topic processed by the AI core this shift cycle. Filter logs below to inspect query context or latency trends.
+                            </p>
+
+                            <div className="flex items-center gap-2.5 shrink-0 self-start md:self-center">
+                                <button
+                                    onClick={() => {
+                                        setLogSearch(topIssueInfo.name);
+                                        document.getElementById('recent-telemetry-table')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                    }}
+                                    className="px-4 py-2 rounded-xl border border-white/20 hover:border-white/50 hover:bg-white/10 text-white text-xs font-semibold transition-all cursor-pointer shadow-xs"
+                                >
+                                    View logs
+                                </button>
+
+                                <button
+                                    onClick={() => setIsAlertAcknowledged(true)}
+                                    className="px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-900 text-xs font-bold transition-all shadow-md active:scale-[0.98] cursor-pointer"
+                                >
+                                    Acknowledge
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Stat Cards Row */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="p-6 bg-white rounded-2xl border border-slate-200 shadow-sm">
-                    <h3 className="text-slate-500 text-sm font-medium mb-2">Total Queries</h3>
-                    <p className="text-3xl font-bold text-slate-900">{dynamicTotalQueries}</p>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+
+                {/* Combined Dual Metric Card: Total Queries | Blocked Attempts */}
+                <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col sm:flex-row items-center divide-y sm:divide-y-0 sm:divide-x divide-slate-200">
+
+                    {/* Left Metric: Total Queries (Shifted slightly right with sm:pl-8) */}
+                    <div className="w-full sm:w-1/2 flex items-center gap-3.5 sm:pl-8 sm:pr-4 pb-4 sm:pb-0">
+                        <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-blue-600/20">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                            </svg>
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-xl sm:text-2xl font-bold text-slate-900 leading-none">
+                                {dynamicTotalQueries.toLocaleString()}
+                            </p>
+                            <p className="text-xs font-medium text-slate-500 mt-1">
+                                Total Queries
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Right Metric: Blocked Attempts (Shifted slightly right with sm:pl-12) */}
+                    <div className="w-full sm:w-1/2 flex items-center gap-3.5 sm:pl-12 sm:pr-4 pt-4 sm:pt-0">
+                        <div className="w-10 h-10 rounded-full bg-orange-500 text-white flex items-center justify-center shrink-0 shadow-sm shadow-orange-500/20">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                            </svg>
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-xl sm:text-2xl font-bold text-slate-900 leading-none">
+                                {dynamicBlockedAttempts.toLocaleString()}
+                            </p>
+                            <p className="text-xs font-medium text-slate-500 mt-1">
+                                Blocked Attempts
+                            </p>
+                        </div>
+                    </div>
+
                 </div>
-                <div className="p-6 bg-white rounded-2xl border border-slate-200 shadow-sm">
-                    <h3 className="text-slate-500 text-sm font-medium mb-2">Blocked Attempts</h3>
-                    <p className="text-3xl font-bold text-rose-600">{dynamicBlockedAttempts}</p>
-                </div>
-                <div className="p-6 bg-white rounded-2xl border border-slate-200 shadow-sm">
-                    <h3 className="text-slate-500 text-sm font-medium mb-2">Top Issue</h3>
-                    <p className="text-xl font-bold text-emerald-600 truncate" title={dynamicTopIssue}>
-                        {dynamicTopIssue}
+
+                {/* Top Issue Card */}
+                <div className="lg:col-span-1 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                            Top Issue
+                        </span>
+                    </div>
+
+                    <div className="my-1.5 min-w-0">
+                        <p className="text-lg sm:text-xl font-bold text-slate-900 truncate" title={dynamicTopIssue}>
+                            {dynamicTopIssue || 'No Issues Logged'}
+                        </p>
+                    </div>
+
+                    <p className="text-[11px] text-slate-400 truncate">
+                        Highest frequency operator inquiry this shift
                     </p>
                 </div>
             </div>
 
             {/* Charts & AI Shift Summary Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-                {/* Frequency Bar Chart */}
-                <div className="lg:col-span-2 p-6 bg-white rounded-2xl border border-slate-200 shadow-sm min-h-[300px] flex flex-col">
-                    <h3 className="text-lg font-semibold mb-4 text-slate-900">Query Frequency (Top 5)</h3>
-                    <div className="flex-1 w-full min-h-[250px]">
+                {/* Frequency Bar Chart - Clean Tonal Layout */}
+                <div className="lg:col-span-2 p-6 bg-white rounded-2xl border border-slate-200 shadow-sm min-h-[340px] flex flex-col justify-between">
+
+                    {/* Clean Single-Line Header */}
+                    <div className="flex items-center justify-between mb-6">
+                        <div>
+                            <h3 className="text-lg font-bold text-slate-900 tracking-tight">Query Frequency (Top 5)</h3>
+                            <p className="text-xs text-slate-500 mt-0.5">Distribution across primary operational inquiries</p>
+                        </div>
+
+                    </div>
+
+                    {/* Chart Canvas with Direct Bar Value Labels */}
+                    <div className="flex-1 w-full min-h-[240px]">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                                <XAxis dataKey="name" stroke="#64748b" fontSize={12} tick={{ fill: '#64748b' }} />
-                                <YAxis stroke="#64748b" fontSize={12} tick={{ fill: '#64748b' }} allowDecimals={false} />
-                                <Tooltip
-                                    contentStyle={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', color: '#0f172a', borderRadius: '0.5rem', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                    itemStyle={{ color: '#2563eb' }}
+                            <BarChart data={chartData} margin={{ top: 22, right: 12, left: -20, bottom: 4 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                                <XAxis
+                                    dataKey="name"
+                                    stroke="#94a3b8"
+                                    fontSize={11}
+                                    tickLine={false}
+                                    axisLine={{ stroke: '#e2e8f0' }}
+                                    tick={{ fill: '#64748b', fontWeight: 500 }}
                                 />
-                                <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                                <YAxis
+                                    stroke="#94a3b8"
+                                    fontSize={11}
+                                    tickLine={false}
+                                    axisLine={false}
+                                    tick={{ fill: '#94a3b8' }}
+                                    allowDecimals={false}
+                                />
+                                <Tooltip
+                                    cursor={{ fill: '#f8fafc' }}
+                                    content={({ active, payload }) => {
+                                        if (active && payload && payload.length) {
+                                            const data = payload[0].payload;
+                                            return (
+                                                <div className="bg-white px-3 py-2 rounded-xl shadow-lg border border-slate-200 text-xs">
+                                                    <p className="font-semibold text-slate-900 mb-0.5">{data.name}</p>
+                                                    <p className="text-slate-500 font-mono text-[11px]">
+                                                        Total Inquiries: <strong className="text-blue-600 font-bold">{data.count}</strong>
+                                                    </p>
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    }}
+                                />
+                                <Bar dataKey="count" radius={[6, 6, 0, 0]} maxBarSize={56}>
+                                    {/* Direct count above each bar */}
+                                    <LabelList
+                                        dataKey="count"
+                                        position="top"
+                                        fill="#475569"
+                                        fontSize={12}
+                                        fontWeight={700}
+                                        offset={8}
+                                    />
+                                    {(chartData || []).map((entry, index) => (
+                                        <Cell
+                                            key={`cell-${index}`}
+                                            fill={BAR_COLORS[index % BAR_COLORS.length]}
+                                        />
+                                    ))}
+                                </Bar>
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
+
                 </div>
 
                 {/* AI Shift Briefing */}
@@ -323,53 +535,116 @@ export default function OverviewTab({
                 </div>
             </div>
 
-            {/* Recent Telemetry Table */}
-            <div className="mt-8 p-6 bg-white rounded-2xl border border-slate-200 shadow-sm">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold text-slate-900">Recent Telemetry Logs</h3>
-                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600 font-medium">
-                        {filteredLogs.length} events
-                    </span>
+            {/* Recent Telemetry Table with Search & Multi-Filters */}
+            <div id="recent-telemetry-table" className="mt-8 p-6 bg-white rounded-2xl border border-slate-200 shadow-sm">
+
+                {/* 1. Header & Counter */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-4 border-b border-slate-100">
+                    <div>
+                        <h3 className="text-lg font-semibold text-slate-900 tracking-tight">Recent Telemetry Logs</h3>
+                        <p className="text-xs text-slate-500 mt-0.5">Filter diagnostic events by prompt, status, or date</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-600 font-medium">
+                            Showing {displayedLogs.length} of {filteredLogs.length} events
+                        </span>
+                    </div>
                 </div>
 
+                {/* 2. Filter Toolbar */}
+                <div className="flex flex-wrap items-center gap-3 mb-4">
+                    {/* A. Text Search (Prompt & Time) */}
+                    <div className="relative flex-1 min-w-[200px]">
+                        <svg className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <input
+                            type="text"
+                            placeholder="Search operator prompt..."
+                            value={logSearch}
+                            onChange={(e) => setLogSearch(e.target.value)}
+                            className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-blue-500 transition-colors"
+                        />
+                    </div>
+
+                    {/* B. Specific Date Picker */}
+                    <div className="relative">
+                        <input
+                            type="date"
+                            value={dateFilter}
+                            onChange={(e) => setDateFilter(e.target.value)}
+                            className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 focus:bg-white focus:outline-none focus:border-blue-500 transition-colors"
+                        />
+                    </div>
+
+                    {/* C. Status Filter Pills */}
+                    <div className="flex bg-slate-100 p-0.5 rounded-xl border border-slate-200">
+                        {[
+                            { id: 'all', label: 'All' },
+                            { id: 'resolved', label: 'Resolved' },
+                            { id: 'blocked', label: 'Blocked' }
+                        ].map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => setStatusFilter(tab.id)}
+                                className={`px-3 py-1 text-xs font-medium rounded-lg transition-all cursor-pointer ${statusFilter === tab.id
+                                    ? 'bg-blue-600 text-white shadow-xs'
+                                    : 'text-slate-600 hover:text-slate-900'
+                                    }`}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* 3. Filtered Table View */}
                 {isLoading ? (
-                    <div className="text-slate-400 animate-pulse">Loading database logs...</div>
+                    <div className="text-slate-400 animate-pulse py-8 text-center text-xs">Loading database logs...</div>
                 ) : (
-                    <div className="max-h-[420px] overflow-y-auto overflow-x-auto no-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] rounded-xl border border-slate-200">
+                    <div className="max-h-[420px] overflow-y-auto overflow-x-auto no-scrollbar rounded-xl border border-slate-200">
                         <table className="w-full text-left text-sm text-slate-700">
-                            <thead className="bg-slate-50 backdrop-blur border-b border-slate-200 sticky top-0 z-10">
+                            <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
                                 <tr>
-                                    <th className="p-4 font-semibold text-slate-700">Timestamp</th>
-                                    <th className="p-4 font-semibold text-slate-700">Operator Prompt</th>
-                                    <th className="p-4 font-semibold text-slate-700">Latency</th>
-                                    <th className="p-4 font-semibold text-slate-700">Status</th>
+                                    <th className="p-4 font-semibold text-slate-700 text-xs">Timestamp</th>
+                                    <th className="p-4 font-semibold text-slate-700 text-xs">Operator Prompt</th>
+                                    <th className="p-4 font-semibold text-slate-700 text-xs">Latency</th>
+                                    <th className="p-4 font-semibold text-slate-700 text-xs text-right">Status</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-200 bg-white">
-                                {filteredLogs.map((log) => (
-                                    <tr key={log.id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="p-4 whitespace-nowrap text-xs text-slate-500">
-                                            {new Date(log.timestamp).toLocaleString()}
-                                        </td>
-                                        <td className="p-4 max-w-md truncate font-medium text-slate-800" title={log.prompt}>
-                                            {log.prompt}
-                                        </td>
-                                        <td className="p-4 font-mono text-emerald-600 text-xs font-semibold">
-                                            {log.latencyMs} ms
-                                        </td>
-                                        <td className="p-4">
-                                            {log.isSuccessful !== false && !log.response?.toLowerCase().includes("out of scope") ? (
-                                                <span className="px-2 py-1 bg-emerald-50 text-emerald-700 rounded text-xs border border-emerald-200 font-medium">
-                                                    Resolved
-                                                </span>
-                                            ) : (
-                                                <span className="px-2 py-1 bg-rose-50 text-rose-700 rounded text-xs border border-rose-200 font-medium">
-                                                    Blocked
-                                                </span>
-                                            )}
+                                {displayedLogs.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="4" className="p-8 text-center text-slate-400 text-xs italic">
+                                            No logs match the selected filter criteria.
                                         </td>
                                     </tr>
-                                ))}
+                                ) : (
+                                    displayedLogs.map((log) => (
+                                        <tr key={log.id} className="hover:bg-slate-50 transition-colors">
+                                            <td className="p-4 whitespace-nowrap text-xs text-slate-500 font-mono">
+                                                {new Date(log.timestamp).toLocaleString()}
+                                            </td>
+                                            <td className="p-4 max-w-md truncate font-medium text-slate-800 text-xs" title={log.prompt}>
+                                                {log.prompt}
+                                            </td>
+                                            <td className="p-4 font-mono text-emerald-600 text-xs font-semibold">
+                                                {log.latencyMs} ms
+                                            </td>
+                                            <td className="p-4 text-right">
+                                                {log.isSuccessful !== false && !log.response?.toLowerCase().includes("out of scope") ? (
+                                                    <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md text-[10px] font-bold border border-emerald-200 uppercase tracking-wider">
+                                                        Resolved
+                                                    </span>
+                                                ) : (
+                                                    <span className="px-2 py-0.5 bg-rose-50 text-rose-700 rounded-md text-[10px] font-bold border border-rose-200 uppercase tracking-wider">
+                                                        Blocked
+                                                    </span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
                             </tbody>
                         </table>
                     </div>
