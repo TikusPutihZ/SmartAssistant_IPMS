@@ -86,6 +86,26 @@ export default function OverviewTab({
         '#93c5fd', // 5. Light Sky Blue
     ];
 
+    // Track dismissed gap items in localStorage so they stay dismissed on refresh
+    const [dismissedGaps, setDismissedGaps] = useState(() => {
+        try {
+            return JSON.parse(localStorage.getItem('ipms_dismissed_gaps') || '[]');
+        } catch {
+            return [];
+        }
+    });
+
+    // Controls the confirmation modal (holds prompt string, or null when closed)
+    const [gapToDismiss, setGapToDismiss] = useState(null);
+
+    const confirmDismissGap = () => {
+        if (!gapToDismiss) return;
+        const updated = [...dismissedGaps, gapToDismiss];
+        setDismissedGaps(updated);
+        localStorage.setItem('ipms_dismissed_gaps', JSON.stringify(updated));
+        setGapToDismiss(null);
+    };
+
 
     return (
         <>
@@ -388,7 +408,8 @@ export default function OverviewTab({
             </div>
 
             {/* Guardrail Breakdown & Knowledge Gap Detector */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-10">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+
                 {/* Donut Resolution Ratio */}
                 <div className="p-6 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
                     <div>
@@ -409,7 +430,7 @@ export default function OverviewTab({
                                     itemStyle={{ color: '#0f172a' }}
                                 />
                                 <Pie
-                                    data={resolutionPieData}
+                                    data={resolutionPieData || []}
                                     dataKey="value"
                                     nameKey="name"
                                     cx="50%"
@@ -418,144 +439,178 @@ export default function OverviewTab({
                                     outerRadius={75}
                                     paddingAngle={4}
                                 >
-                                    {resolutionPieData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.color} stroke="#ffffff" strokeWidth={2} />
-                                    ))}
+                                    {(resolutionPieData || []).map((entry, index) => {
+                                        // Overrides any incoming green/red with theme Blue & Orange
+                                        const isBlocked = (entry.name || '').toLowerCase().includes('block');
+                                        const sliceColor = isBlocked ? '#f97316' : '#2563eb'; // Orange for Blocked, Royal Blue for Resolved
+                                        return (
+                                            <Cell key={`cell-${index}`} fill={sliceColor} stroke="#ffffff" strokeWidth={2} />
+                                        );
+                                    })}
                                 </Pie>
                             </PieChart>
                         </ResponsiveContainer>
 
+                        {/* Center Donut Metric */}
                         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                            <span className="text-2xl font-bold text-rose-600">{blockedPercentage}%</span>
+                            <span className="text-2xl font-bold text-orange-500">{blockedPercentage}%</span>
                             <span className="text-[10px] uppercase tracking-wider text-slate-500 font-medium">Blocked</span>
                         </div>
                     </div>
 
+                    {/* Bottom Split Pill Summary */}
                     <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-200">
+                        {/* Resolved */}
                         <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-center">
-                            <div className="flex items-center justify-center gap-1.5 text-xs text-emerald-600 font-semibold mb-0.5">
-                                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            <div className="flex items-center justify-center gap-1.5 text-xs text-blue-600 font-semibold mb-0.5">
+                                <span className="w-2 h-2 rounded-full bg-blue-600"></span>
                                 <span>{resolvedPercentage}%</span>
                             </div>
                             <span className="text-[11px] text-slate-500">Resolved ({dynamicResolved})</span>
                         </div>
 
+                        {/* Blocked */}
                         <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-center">
-                            <div className="flex items-center justify-center gap-1.5 text-xs text-rose-600 font-semibold mb-0.5">
-                                <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                            <div className="flex items-center justify-center gap-1.5 text-xs text-orange-600 font-semibold mb-0.5">
+                                <span className="w-2 h-2 rounded-full bg-orange-500"></span>
                                 <span>{blockedPercentage}%</span>
                             </div>
-                            <span className="text-[11px] text-slate-500">Blocked ({dynamicBlockedAttempts})</span>
+                            <span className="text-[11px] text-slate-500">Blocked ({(dynamicBlockedAttempts || 0)})</span>
                         </div>
                     </div>
                 </div>
 
                 {/* Knowledge Gap Detector */}
-                <div className="lg:col-span-2 p-6 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col">
-                    <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-2">
-                            <h3 className="text-base font-semibold text-slate-900">Knowledge Gap Detector</h3>
-                            <span className="px-2 py-0.5 text-[10px] rounded-full bg-rose-50 text-rose-600 border border-rose-200 font-medium">
-                                Missing References
+                <div className="lg:col-span-2 p-6 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+
+                    {/* 1. Header Section */}
+                    <div>
+                        <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center gap-2">
+                                <h3 className="text-base font-semibold text-slate-900">Knowledge Gap Detector</h3>
+                            </div>
+                            <span className="text-xs text-slate-500 font-medium">
+                                {(blockedLogs || []).length} total blocks
                             </span>
                         </div>
-                        <span className="text-xs text-slate-500">{blockedLogs.length} total blocks</span>
+                        <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                            Frequent operator prompts blocked by guardrails. Click <strong>Draft Manual</strong> to register documentation, or dismiss noise.
+                        </p>
                     </div>
-                    <p className="text-xs text-slate-500 mb-4">
-                        Frequent operator prompts blocked by guardrails. Click <strong>Draft Manual</strong> to register missing equipment documentation directly into the knowledge base.
-                    </p>
 
+                    {/* 2. Items List */}
                     <div className="flex-1 space-y-2.5 overflow-y-auto max-h-[320px] no-scrollbar pr-1">
-                        {topBlockedGaps.length === 0 ? (
+                        {((topBlockedGaps || []).filter(item => !dismissedGaps.includes(item.prompt))).length === 0 ? (
                             <div className="h-full flex flex-col items-center justify-center py-10 text-slate-400 text-xs">
-                                <svg className="w-8 h-8 text-emerald-500/50 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-8 h-8 text-blue-500/40 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
-                                No blocked attempts recorded in this time range. Knowledge coverage is optimal!
+                                No active knowledge gaps pending review. All clear!
                             </div>
                         ) : (
-                            topBlockedGaps.map((item, idx) => {
-                                const isExpanded = expandedGap === item.prompt;
-                                const matchingLogs = blockedLogs.filter(
-                                    log => (log.prompt || '').trim() === item.prompt
-                                );
+                            (topBlockedGaps || [])
+                                .filter(item => !dismissedGaps.includes(item.prompt))
+                                .map((item, idx) => {
+                                    const isExpanded = expandedGap === item.prompt;
+                                    const matchingLogs = (blockedLogs || []).filter(
+                                        log => (log.prompt || '').trim() === item.prompt
+                                    );
 
-                                return (
-                                    <div
-                                        key={idx}
-                                        className="bg-slate-50 border border-slate-200 rounded-xl transition-all duration-200 overflow-hidden"
-                                    >
-                                        <div className="p-3 flex items-center justify-between gap-3">
-                                            <div
-                                                onClick={() => setExpandedGap(isExpanded ? null : item.prompt)}
-                                                className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer select-none group"
-                                            >
-                                                <span className="w-6 h-6 rounded-lg bg-rose-100 border border-rose-200 text-rose-600 text-xs font-bold flex items-center justify-center shrink-0">
-                                                    {idx + 1}
-                                                </span>
-
-                                                <div className="truncate flex-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <p className="text-sm font-medium text-slate-800 group-hover:text-blue-600 transition-colors truncate" title={item.prompt}>
-                                                            {item.prompt}
-                                                        </p>
-                                                        <svg
-                                                            className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 shrink-0 ${isExpanded ? 'rotate-180 text-blue-600' : ''}`}
-                                                            fill="none"
-                                                            stroke="currentColor"
-                                                            viewBox="0 0 24 24"
-                                                        >
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                                                        </svg>
-                                                    </div>
-                                                    <span className="text-[11px] text-slate-500">
-                                                        Queried {item.count} {item.count === 1 ? 'time' : 'times'} • {isExpanded ? 'Click to collapse' : 'Click to view summary'}
+                                    return (
+                                        <div
+                                            key={idx}
+                                            className="bg-slate-50 border border-slate-200 rounded-xl transition-all duration-200 overflow-hidden"
+                                        >
+                                            <div className="p-3 flex items-center justify-between gap-3">
+                                                {/* Left: Number + Title & Subtitle */}
+                                                <div
+                                                    onClick={() => setExpandedGap && setExpandedGap(isExpanded ? null : item.prompt)}
+                                                    className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer select-none group"
+                                                >
+                                                    <span className="w-6 h-6 rounded-lg bg-orange-500 text-white text-xs font-bold flex items-center justify-center shrink-0 shadow-xs shadow-orange-500/20">
+                                                        {idx + 1}
                                                     </span>
-                                                </div>
-                                            </div>
 
-                                            <button
-                                                onClick={() => handleDraftManualFromGap(item.prompt)}
-                                                title="Create documentation for this prompt"
-                                                className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white border border-blue-200 rounded-lg text-xs font-medium transition-all shadow-sm"
-                                            >
-                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-                                                </svg>
-                                                Draft Manual
-                                            </button>
-                                        </div>
-
-                                        {isExpanded && (
-                                            <div className="px-4 pb-3.5 pt-1 border-t border-slate-200 bg-white text-xs space-y-2.5 animate-fade-in">
-                                                <div className="p-3 rounded-lg bg-blue-50 border border-blue-100 text-slate-700 leading-relaxed">
-                                                    <div className="flex items-center gap-1.5 text-blue-700 font-semibold mb-1 text-[11px] uppercase tracking-wider">
-                                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                        </svg>
-                                                        <span>Operator Intent Summary</span>
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <p className="text-sm font-medium text-slate-800 group-hover:text-blue-600 transition-colors truncate" title={item.prompt}>
+                                                                {item.prompt}
+                                                            </p>
+                                                            <svg
+                                                                className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 shrink-0 ${isExpanded ? 'rotate-180 text-blue-600' : ''}`}
+                                                                fill="none"
+                                                                stroke="currentColor"
+                                                                viewBox="0 0 24 24"
+                                                            >
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                                                            </svg>
+                                                        </div>
+                                                        {/* Fixed truncation: Clean, compact subtitle */}
+                                                        <p className="text-[11px] text-slate-500 truncate">
+                                                            Queried {item.count} {item.count === 1 ? 'time' : 'times'} • {isExpanded ? 'Collapse' : 'View context'}
+                                                        </p>
                                                     </div>
-                                                    <p className="text-xs text-slate-600">
-                                                        {getGapSummarySentence(item.prompt, matchingLogs)}
-                                                    </p>
                                                 </div>
 
-                                                <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
-                                                    <span className="font-medium text-slate-600">Log timestamps:</span>
-                                                    {matchingLogs.map((l, lIdx) => (
-                                                        <span
-                                                            key={lIdx}
-                                                            className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono text-[10px] text-slate-600"
-                                                        >
-                                                            {new Date(l.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                        </span>
-                                                    ))}
+                                                {/* Right: Actions */}
+                                                <div className="flex items-center gap-1.5 shrink-0">
+                                                    <button
+                                                        onClick={() => handleDraftManualFromGap && handleDraftManualFromGap(item.prompt)}
+                                                        title="Create documentation for this prompt"
+                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white border border-blue-200 rounded-lg text-xs font-medium transition-all shadow-xs cursor-pointer"
+                                                    >
+                                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                                                        </svg>
+                                                        Draft Manual
+                                                    </button>
+
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setGapToDismiss(item.prompt);
+                                                        }}
+                                                        title="Dismiss from knowledge gaps"
+                                                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg border border-transparent hover:border-rose-200 transition-all cursor-pointer"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        </svg>
+                                                    </button>
                                                 </div>
                                             </div>
-                                        )}
-                                    </div>
-                                );
-                            })
+
+                                            {/* Expanded Context Details */}
+                                            {isExpanded && (
+                                                <div className="px-4 pb-3.5 pt-1 border-t border-slate-200 bg-white text-xs space-y-2.5 animate-fade-in">
+                                                    <div className="p-3 rounded-lg bg-blue-50 border border-blue-100 text-slate-700 leading-relaxed">
+                                                        <div className="flex items-center gap-1.5 text-blue-700 font-semibold mb-1 text-[11px] uppercase tracking-wider">
+                                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                            </svg>
+                                                            <span>Operator Intent Summary</span>
+                                                        </div>
+                                                        <p className="text-xs text-slate-600">
+                                                            {getGapSummarySentence && getGapSummarySentence(item.prompt, matchingLogs)}
+                                                        </p>
+                                                    </div>
+
+                                                    <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                                                        <span className="font-medium text-slate-600">Timestamps:</span>
+                                                        {matchingLogs.map((l, lIdx) => (
+                                                            <span
+                                                                key={lIdx}
+                                                                className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono text-[10px] text-slate-600"
+                                                            >
+                                                                {new Date(l.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })
                         )}
                     </div>
                 </div>
@@ -673,6 +728,54 @@ export default function OverviewTab({
                                 )}
                             </tbody>
                         </table>
+                    </div>
+                )}
+
+                {/* Minimal Centered Confirmation Modal */}
+                {gapToDismiss && (
+                    <div className="fixed inset-0 z-50 bg-slate-900/30 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+                        {/* Wider card container (max-w-md) for generous horizontal breathing room */}
+                        <div className="bg-white rounded-[32px] border border-slate-100 shadow-2xl max-w-md w-full p-8 sm:p-9 flex flex-col items-center text-center">
+
+                            {/* 1. Scaled down icon (w-12 h-12 instead of w-16 h-16) */}
+                            <img
+                                src="/red-trash-can-icon.png"
+                                alt="Delete"
+                                className="w-12 h-12 object-contain mb-4 select-none pointer-events-none"
+                            />
+
+                            {/* 2. Title */}
+                            <h3 className="text-slate-900 font-bold text-lg sm:text-xl mb-2">
+                                Dismiss Knowledge Gap?
+                            </h3>
+
+                            {/* 3. Explanation: Tighter vertical line spacing without awkward word wrapping */}
+                            <div className="text-xs sm:text-[13px] text-slate-500 font-normal leading-snug mb-6 max-w-sm px-2">
+                                <p>
+                                    Are you sure you want to dismiss <span className="font-semibold text-slate-700">"{gapToDismiss}"</span>?
+                                </p>
+                                <p className="text-slate-400 mt-0.5">
+                                    This action cannot be undone.
+                                </p>
+                            </div>
+
+                            {/* 4. Action Buttons */}
+                            <div className="flex items-center justify-center gap-3.5 w-full max-w-xs">
+                                <button
+                                    onClick={() => setGapToDismiss(null)}
+                                    className="flex-1 py-2.5 px-5 rounded-full border border-rose-200 text-sm font-medium text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={confirmDismissGap}
+                                    className="flex-1 py-2.5 px-5 rounded-full bg-[#eb4d55] hover:bg-[#d83c44] text-white text-sm font-medium transition-colors cursor-pointer"
+                                >
+                                    Delete
+                                </button>
+                            </div>
+
+                        </div>
                     </div>
                 )}
             </div>
