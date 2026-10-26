@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 export default function KnowledgeTab({
     knowledgeBase,
     selectedFile,
@@ -21,6 +23,10 @@ export default function KnowledgeTab({
     setEditForm,
     handleDeleteManual
 }) {
+
+    // Tracks the manual selected for deletion to show the modal
+    const [manualToDelete, setManualToDelete] = useState(null);
+
     return (
         <div className="animate-fade-in select-none">
             <header className="mb-4">
@@ -89,7 +95,7 @@ export default function KnowledgeTab({
                                 <div className="flex gap-2 mt-2 pt-2 border-t border-slate-100">
                                     <button
                                         onClick={handleConfirmUpload}
-                                        className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-medium transition-colors shadow-sm cursor-pointer"
+                                        className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-colors shadow-sm cursor-pointer"
                                     >
                                         Confirm & Upload
                                     </button>
@@ -129,7 +135,7 @@ export default function KnowledgeTab({
                                     required
                                 />
                             </div>
-                            <button type="submit" className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-medium transition-colors shadow-sm cursor-pointer">
+                            <button type="submit" className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors shadow-sm cursor-pointer">
                                 Save to Database
                             </button>
                         </form>
@@ -274,13 +280,13 @@ export default function KnowledgeTab({
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                         </svg>
                                                         <span>
-                                                            Edited by <strong className="text-slate-700 font-medium">{entry.lastModifiedBy || 'Admin'}</strong> • {formattedDate}
+                                                            {(entry.createdAt && entry.createdAt === entry.lastModifiedAt ? 'Added' : 'Edited')} by <strong className="text-slate-700 font-medium">{entry.lastModifiedBy || 'Admin'}</strong> • {formattedDate}
                                                         </span>
                                                     </div>
                                                 )}
                                             </div>
 
-                                            <div className="flex items-center gap-2 self-end md:self-center shrink-0">
+                                            <div className="flex items-center gap-1.5 self-end md:self-center shrink-0">
                                                 {!isPdfSource && (
                                                     <button
                                                         onClick={(e) => {
@@ -292,7 +298,7 @@ export default function KnowledgeTab({
                                                                 content: entry.content || ''
                                                             });
                                                         }}
-                                                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 border border-blue-200 rounded-lg text-xs font-medium transition-all cursor-pointer"
+                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white border border-blue-200 rounded-lg text-xs font-medium transition-all shadow-xs cursor-pointer"
                                                     >
                                                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -301,17 +307,18 @@ export default function KnowledgeTab({
                                                     </button>
                                                 )}
 
+                                                {/* Minimal Trash Button */}
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        handleDeleteManual(entry.id);
+                                                        setManualToDelete(entry);
                                                     }}
-                                                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 border border-rose-200 rounded-lg text-xs font-medium transition-all cursor-pointer"
+                                                    title="Delete Manual"
+                                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg border border-transparent hover:border-rose-200 transition-all cursor-pointer"
                                                 >
-                                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                                     </svg>
-                                                    Delete
                                                 </button>
                                             </div>
                                         </div>
@@ -321,6 +328,64 @@ export default function KnowledgeTab({
                     </div>
                 </div>
             </div>
+
+            {/* Minimal Centered Confirmation Modal */}
+            {manualToDelete && (
+                <div
+                    className="fixed inset-0 z-50 bg-slate-900/30 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in"
+                    onClick={(e) => e.stopPropagation()} // Prevent clicking background from expanding manual card
+                >
+                    {/* Wider card container (max-w-md) for generous horizontal breathing room */}
+                    <div className="bg-white rounded-[32px] border border-slate-100 shadow-2xl max-w-md w-full p-8 sm:p-9 flex flex-col items-center text-center">
+
+                        {/* 1. Scaled down icon (w-12 h-12) */}
+                        <img
+                            src="/red-trash-can-icon.png"
+                            alt="Delete"
+                            className="w-12 h-12 object-contain mb-4 select-none pointer-events-none"
+                        />
+
+                        {/* 2. Title */}
+                        <h3 className="text-slate-900 font-bold text-lg sm:text-xl mb-2">
+                            Confirm Deletion?
+                        </h3>
+
+                        {/* 3. Explanation: Tighter vertical line spacing */}
+                        <div className="text-xs sm:text-[13px] text-slate-500 font-normal leading-snug mb-6 max-w-sm px-2">
+                            <p>
+                                Are you sure you want to delete <span className="font-semibold text-slate-700">"{manualToDelete.title || manualToDelete.category}"</span>?
+                            </p>
+                            <p className="text-slate-400 mt-0.5">
+                                This action cannot be undone.
+                            </p>
+                        </div>
+
+                        {/* 4. Action Buttons */}
+                        <div className="flex items-center justify-center gap-3.5 w-full max-w-xs">
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setManualToDelete(null);
+                                }}
+                                className="flex-1 py-2.5 px-5 rounded-full border border-rose-200 text-sm font-medium text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteManual(manualToDelete.id);
+                                    setManualToDelete(null);
+                                }}
+                                className="flex-1 py-2.5 px-5 rounded-full bg-[#eb4d55] hover:bg-[#d83c44] text-white text-sm font-medium transition-colors cursor-pointer"
+                            >
+                                Delete
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

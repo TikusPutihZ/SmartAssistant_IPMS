@@ -27,6 +27,9 @@ namespace IpmsSmartAssistant.Api.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("CreatedAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Keywords")
                         .IsRequired()
                         .HasColumnType("TEXT");

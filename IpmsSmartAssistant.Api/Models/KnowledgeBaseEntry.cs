@@ -9,5 +9,6 @@ namespace IpmsSmartAssistant.Api.Models
 
         public string? LastModifiedBy { get; set; }
         public DateTime? LastModifiedAt { get; set; }
+        public DateTime? CreatedAt { get; set; }
     }
 }

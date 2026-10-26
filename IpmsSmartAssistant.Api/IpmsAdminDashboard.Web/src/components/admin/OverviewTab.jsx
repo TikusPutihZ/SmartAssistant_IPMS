@@ -273,7 +273,7 @@ export default function OverviewTab({
             </div>
 
             {/* Charts & AI Shift Summary Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-10">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
                 {/* Frequency Bar Chart - Clean Tonal Layout */}
                 <div className="lg:col-span-2 p-6 bg-white rounded-2xl border border-slate-200 shadow-sm min-h-[340px] flex flex-col justify-between">
 
@@ -408,7 +408,7 @@ export default function OverviewTab({
             </div>
 
             {/* Guardrail Breakdown & Knowledge Gap Detector */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
 
                 {/* Donut Resolution Ratio */}
                 <div className="p-6 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">

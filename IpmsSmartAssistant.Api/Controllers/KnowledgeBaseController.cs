@@ -48,6 +48,7 @@ namespace IpmsSmartAssistant.Api.Controllers
                     e.Content,
                     e.LastModifiedBy,
                     e.LastModifiedAt,
+                    e.CreatedAt,
                     FileExtension = ext
                 };
             });
@@ -64,6 +65,12 @@ namespace IpmsSmartAssistant.Api.Controllers
             {
                 return BadRequest(new { message = "Manual content cannot be empty." });
             }
+
+            // EXACT MATCH: Set both to the exact same time for new entries
+            var currentTime = DateTime.Now;
+            newEntry.CreatedAt = currentTime;
+            newEntry.LastModifiedAt = currentTime;
+            newEntry.LastModifiedBy = string.IsNullOrWhiteSpace(newEntry.LastModifiedBy) ? "Admin" : newEntry.LastModifiedBy;
 
             _context.KnowledgeBaseEntries.Add(newEntry);
             await _context.SaveChangesAsync();
@@ -130,13 +137,15 @@ namespace IpmsSmartAssistant.Api.Controllers
                 }
 
                 // 3. Save to database
+                var currentTime = DateTime.UtcNow;
                 var newEntry = new KnowledgeBaseEntry
                 {
                     Title = cleanFileName,
                     Content = extractedContent,
                     Keywords = keywords ?? string.Empty,
                     LastModifiedBy = "Admin",
-                    LastModifiedAt = DateTime.UtcNow
+                    CreatedAt = currentTime,     // Ensure this is added
+                    LastModifiedAt = currentTime
                 };
 
                 _context.KnowledgeBaseEntries.Add(newEntry);
@@ -213,24 +222,31 @@ namespace IpmsSmartAssistant.Api.Controllers
             var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
             return File(fileStream, "application/pdf");
         }
+
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateManual(int id, [FromBody] UpdateManualRequest request)
         {
             var entry = await _context.KnowledgeBaseEntries.FindAsync(id);
-            if (entry == null)
+            if (entry == null) return NotFound();
+
+            // Rescue older records: lock in the original date before editing
+            if (entry.CreatedAt == null)
             {
-                return NotFound(new { message = $"Manual with ID {id} not found." });
+                entry.CreatedAt = entry.LastModifiedAt;
             }
 
             entry.Title = request.Title;
             entry.Keywords = request.Keywords;
             entry.Content = request.Content;
             entry.LastModifiedBy = request.ModifiedBy ?? "Admin";
+
+            // Set the new edit timestamp
             entry.LastModifiedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
             return Ok(entry);
         }
+
         // GET: api/knowledgebase/file/{id}?download=true
         [HttpGet("file/{id}")]
         public async Task<IActionResult> GetDocumentFile(int id, [FromQuery] bool download = false)
@@ -263,6 +279,7 @@ namespace IpmsSmartAssistant.Api.Controllers
             Response.Headers["Content-Disposition"] = "inline";
             return PhysicalFile(matchedFilePath, contentType);
         }
+
         // GET: api/knowledgebase/view/{title}
         [HttpGet("view/{title}")]
         public async Task<IActionResult> ViewManualByTitle(string title)
