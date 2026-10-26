@@ -56,12 +56,6 @@ export default function AdminSidebar({
                             </svg>
                             <span>Manage Knowledge</span>
                         </div>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${activeTab === 'knowledge'
-                                ? 'bg-blue-100 text-blue-700'
-                                : 'bg-blue-800/80 text-blue-100'
-                            }`}>
-                            {knowledgeCount}
-                        </span>
                     </button>
 
                     {/* 3. Export Report Tab */}

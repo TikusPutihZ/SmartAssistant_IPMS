@@ -57,7 +57,8 @@ export default function AdminDashboard() {
       const statsRes = await fetch('http://localhost:5268/api/chat/stats');
       if (statsRes.ok) setStats(await statsRes.json());
 
-      const summaryRes = await fetch('http://localhost:5268/api/chat/summary');
+      // Native fetch matching logsRes and statsRes
+      const summaryRes = await fetch(`http://localhost:5268/api/chat/summary?timeFilter=${timeFilter}`);
       if (summaryRes.ok) {
         const summaryData = await summaryRes.json();
         const cleanedSummary = (summaryData.summary || '')
@@ -75,7 +76,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchDashboardData();
-  }, []);
+  }, [timeFilter]);
 
   useEffect(() => {
     if (activeTab === 'knowledge') fetchKnowledgeBase();
@@ -245,7 +246,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="flex h-screen bg-slate-50 text-slate-900 font-sans overflow-hidden">
-      
+
       {/* 1. Modular Sidebar */}
       <AdminSidebar
         activeTab={activeTab}

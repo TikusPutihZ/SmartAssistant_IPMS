@@ -119,9 +119,6 @@ FORMATTING RULES:
         <div>
           <div className="flex items-center gap-2.5">
             <h2 className="text-2xl font-bold tracking-tight text-slate-900">AI Report Synthesizer</h2>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-600 border border-blue-200 uppercase tracking-wider">
-              Audit Engine v2.4
-            </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
             Persist custom audit templates. Ollama generates formal compliance reports from live telemetry.

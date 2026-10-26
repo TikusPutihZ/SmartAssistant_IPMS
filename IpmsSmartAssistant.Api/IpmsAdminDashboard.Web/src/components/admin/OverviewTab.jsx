@@ -79,20 +79,20 @@ export default function OverviewTab({
     }, [filteredLogs, dynamicTopIssue]);
 
     const BAR_COLORS = [
-        '#2563eb', // 1. Royal Blue
-        '#0284c7', // 2. Sky Blue
-        '#0d9488', // 3. Teal
-        '#6366f1', // 4. Indigo
-        '#f59e0b', // 5. Amber
+        '#1d4ed8', // 1. Deep Royal Blue 
+        '#2563eb', // 2. Corporate Blue
+        '#3b82f6', // 3. Accent Blue
+        '#60a5fa', // 4. Soft Blue
+        '#93c5fd', // 5. Light Sky Blue
     ];
 
 
     return (
         <>
-            <header className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+            <header className="mb-4 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                 <div>
-                    <h2 className="text-3xl font-bold text-slate-900">Dashboard Overview</h2>
-                    <p className="text-slate-500 mt-1">Real-time equipment telemetry and AI guardrail monitoring.</p>
+                    <h2 className="text-2xl font-bold tracking-tight text-slate-900">Dashboard Overview</h2>
+                    <p className="text-xs text-slate-500 mt-1">Real-time equipment telemetry and AI guardrail monitoring.</p>
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -190,7 +190,7 @@ export default function OverviewTab({
             )}
 
             {/* Stat Cards Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
 
                 {/* Combined Dual Metric Card: Total Queries | Blocked Attempts */}
                 <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col sm:flex-row items-center divide-y sm:divide-y-0 sm:divide-x divide-slate-200">
@@ -253,7 +253,7 @@ export default function OverviewTab({
             </div>
 
             {/* Charts & AI Shift Summary Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-10">
                 {/* Frequency Bar Chart - Clean Tonal Layout */}
                 <div className="lg:col-span-2 p-6 bg-white rounded-2xl border border-slate-200 shadow-sm min-h-[340px] flex flex-col justify-between">
 
@@ -269,7 +269,7 @@ export default function OverviewTab({
                     {/* Chart Canvas with Direct Bar Value Labels */}
                     <div className="flex-1 w-full min-h-[240px]">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData} margin={{ top: 22, right: 12, left: -20, bottom: 4 }}>
+                            <BarChart data={chartData} barCategoryGap="15%" margin={{ top: 22, right: 12, left: -20, bottom: 4 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                                 <XAxis
                                     dataKey="name"
@@ -304,8 +304,7 @@ export default function OverviewTab({
                                         return null;
                                     }}
                                 />
-                                <Bar dataKey="count" radius={[6, 6, 0, 0]} maxBarSize={56}>
-                                    {/* Direct count above each bar */}
+                                <Bar dataKey="count" radius={[8, 8, 0, 0]} barSize={90}>
                                     <LabelList
                                         dataKey="count"
                                         position="top"
@@ -328,29 +327,55 @@ export default function OverviewTab({
                 </div>
 
                 {/* AI Shift Briefing */}
-                <div className="p-6 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col no-scrollbar">
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-2">
-                            <h3 className="text-lg font-semibold text-slate-900">AI Shift Briefing</h3>
-                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <div className="p-5 sm:p-6 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+
+                    {/* Header */}
+                    <div className="flex items-start justify-between gap-3 mb-4">
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <h3 className="text-base sm:text-lg font-bold text-slate-900 leading-tight">AI Shift Briefing</h3>
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" title="Ollama Core Active"></span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                                {timeFilter === '1d' ? 'Past 24 Hours' : timeFilter === '7d' ? 'Past 7 Days' : timeFilter === '30d' ? 'Past 30 Days' : 'All-Time Operations'}
+                            </p>
                         </div>
-                        <span className="text-[10px] font-medium tracking-wide uppercase px-2 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-200">
+
+                        <span className="text-[10px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200/80 shrink-0">
                             Ollama Core
                         </span>
                     </div>
 
+                    {/* Briefing Content */}
                     <div className="flex-1 overflow-y-auto text-slate-700 text-sm leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col justify-between">
-                        {aiSummary ? (
+                        {isRefreshing ? (
+                            <div className="flex flex-col items-center justify-center py-7 text-slate-500">
+                                <svg className="w-5 h-5 mb-2 animate-spin text-blue-600" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span className="text-xs font-medium text-slate-600">
+                                    Synthesizing {timeFilter === '1d' ? '24h' : timeFilter === '7d' ? '7d' : timeFilter === '30d' ? '30d' : 'all-time'} telemetry...
+                                </span>
+                            </div>
+                        ) : aiSummary ? (
                             <div className="space-y-3">
-                                <p className="text-slate-800 font-normal leading-relaxed">{aiSummary}</p>
-                                <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-500">
-                                    <span>Automated Telemetry Synthesis</span>
-                                    <span>Plant Operational Status: Stable</span>
+                                <p className="text-slate-800 font-normal leading-relaxed text-xs sm:text-sm">
+                                    {aiSummary}
+                                </p>
+
+                                {/* Clean Status Footer */}
+                                <div className="pt-2.5 border-t border-slate-200/80 flex items-center justify-between">
+                                    <span className="text-[11px] font-medium text-slate-400">Plant Operational Status</span>
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                        Stable
+                                    </span>
                                 </div>
                             </div>
                         ) : (
-                            <span className="flex items-center text-slate-500 animate-pulse py-8 justify-center">
-                                <svg className="w-5 h-5 mr-2 animate-spin text-blue-600" fill="none" viewBox="0 0 24 24">
+                            <span className="flex items-center text-slate-500 animate-pulse py-8 justify-center text-xs">
+                                <svg className="w-4 h-4 mr-2 animate-spin text-blue-600" fill="none" viewBox="0 0 24 24">
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                 </svg>
@@ -358,11 +383,12 @@ export default function OverviewTab({
                             </span>
                         )}
                     </div>
+
                 </div>
             </div>
 
             {/* Guardrail Breakdown & Knowledge Gap Detector */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-10">
                 {/* Donut Resolution Ratio */}
                 <div className="p-6 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
                     <div>

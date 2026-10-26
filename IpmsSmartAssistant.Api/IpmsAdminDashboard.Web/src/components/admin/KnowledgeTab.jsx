@@ -23,9 +23,9 @@ export default function KnowledgeTab({
 }) {
     return (
         <div className="animate-fade-in select-none">
-            <header className="mb-8">
-                <h2 className="text-3xl font-bold text-slate-900">Knowledge Base CMS</h2>
-                <p className="text-slate-500 mt-1">Add or remove industrial manuals for the RAG engine.</p>
+            <header className="mb-4">
+                <h2 className="text-2xl font-bold tracking-tight text-slate-900">Knowledge Base CMS</h2>
+                <p className="text-xs text-slate-500 mt-1">Add or remove industrial manuals for the RAG engine.</p>
             </header>
 
             <div className="flex flex-col gap-6">
